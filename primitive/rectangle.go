@@ -15,10 +15,10 @@ type Rectangle struct {
 
 func NewRandomRectangle(worker *Worker) *Rectangle {
 	rnd := worker.Rnd
-	x1 := rnd.Intn(worker.W)
-	y1 := rnd.Intn(worker.H)
-	x2 := clampInt(x1+rnd.Intn(32)+1, 0, worker.W-1)
-	y2 := clampInt(y1+rnd.Intn(32)+1, 0, worker.H-1)
+	x1, y1 := worker.SamplePosition()
+	span := maxInt(6, int(32*worker.FeatureScaleFactor(x1, y1)))
+	x2 := clampInt(x1+rnd.Intn(span)+1, 0, worker.W-1)
+	y2 := clampInt(y1+rnd.Intn(span)+1, 0, worker.H-1)
 	return &Rectangle{worker, x1, y1, x2, y2}
 }
 
@@ -58,13 +58,14 @@ func (r *Rectangle) Mutate() {
 	w := r.Worker.W
 	h := r.Worker.H
 	rnd := r.Worker.Rnd
+	step := int(r.Worker.MutationStepFor(16, r.X1, r.Y1))
 	switch rnd.Intn(2) {
 	case 0:
-		r.X1 = clampInt(r.X1+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y1 = clampInt(r.Y1+int(rnd.NormFloat64()*16), 0, h-1)
+		r.X1 = clampInt(r.X1+int(rnd.NormFloat64()*float64(step)), 0, w-1)
+		r.Y1 = clampInt(r.Y1+int(rnd.NormFloat64()*float64(step)), 0, h-1)
 	case 1:
-		r.X2 = clampInt(r.X2+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y2 = clampInt(r.Y2+int(rnd.NormFloat64()*16), 0, h-1)
+		r.X2 = clampInt(r.X2+int(rnd.NormFloat64()*float64(step)), 0, w-1)
+		r.Y2 = clampInt(r.Y2+int(rnd.NormFloat64()*float64(step)), 0, h-1)
 	}
 }
 
@@ -86,10 +87,10 @@ type RotatedRectangle struct {
 
 func NewRandomRotatedRectangle(worker *Worker) *RotatedRectangle {
 	rnd := worker.Rnd
-	x := rnd.Intn(worker.W)
-	y := rnd.Intn(worker.H)
-	sx := rnd.Intn(32) + 1
-	sy := rnd.Intn(32) + 1
+	x, y := worker.SamplePosition()
+	span := maxInt(6, int(32*worker.ScaleFactor()))
+	sx := rnd.Intn(span) + 1
+	sy := rnd.Intn(span) + 1
 	a := rnd.Intn(360)
 	r := &RotatedRectangle{worker, x, y, sx, sy, a}
 	r.Mutate()
@@ -102,8 +103,8 @@ func (r *RotatedRectangle) Draw(dc *gg.Context, scale float64) {
 	dc.Translate(float64(r.X), float64(r.Y))
 	dc.Rotate(radians(float64(r.Angle)))
 	dc.DrawRectangle(-sx/2, -sy/2, sx, sy)
-	dc.Pop()
 	dc.Fill()
+	dc.Pop()
 }
 
 func (r *RotatedRectangle) SVG(attrs string) string {
@@ -121,20 +122,23 @@ func (r *RotatedRectangle) Mutate() {
 	w := r.Worker.W
 	h := r.Worker.H
 	rnd := r.Worker.Rnd
-	switch rnd.Intn(3) {
-	case 0:
-		r.X = clampInt(r.X+int(rnd.NormFloat64()*16), 0, w-1)
-		r.Y = clampInt(r.Y+int(rnd.NormFloat64()*16), 0, h-1)
-	case 1:
-		r.Sx = clampInt(r.Sx+int(rnd.NormFloat64()*16), 1, w-1)
-		r.Sy = clampInt(r.Sy+int(rnd.NormFloat64()*16), 1, h-1)
-	case 2:
-		r.Angle = r.Angle + int(rnd.NormFloat64()*32)
+	step := int(r.Worker.MutationStepFor(16, r.X, r.Y))
+	angStep := maxInt(8, int(32*r.Worker.ScaleFactor()))
+	for {
+		switch rnd.Intn(3) {
+		case 0:
+			r.X = clampInt(r.X+int(rnd.NormFloat64()*float64(step)), 0, w-1)
+			r.Y = clampInt(r.Y+int(rnd.NormFloat64()*float64(step)), 0, h-1)
+		case 1:
+			r.Sx = clampInt(r.Sx+int(rnd.NormFloat64()*float64(step)), 1, w-1)
+			r.Sy = clampInt(r.Sy+int(rnd.NormFloat64()*float64(step)), 1, h-1)
+		case 2:
+			r.Angle = r.Angle + int(rnd.NormFloat64()*float64(angStep))
+		}
+		if r.Valid() {
+			break
+		}
 	}
-	// for !r.Valid() {
-	// 	r.Sx = clampInt(r.Sx+int(rnd.NormFloat64()*16), 0, w-1)
-	// 	r.Sy = clampInt(r.Sy+int(rnd.NormFloat64()*16), 0, h-1)
-	// }
 }
 
 func (r *RotatedRectangle) Valid() bool {

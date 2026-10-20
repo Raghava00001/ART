@@ -61,7 +61,7 @@ func SaveJPG(path string, im image.Image, quality int) error {
 		return err
 	}
 	defer file.Close()
-	return jpeg.Encode(file, im, &jpeg.Options{quality})
+	return jpeg.Encode(file, im, &jpeg.Options{Quality: quality})
 }
 
 func SaveGIF(path string, frames []image.Image, delay, lastDelay int) error {
@@ -165,6 +165,14 @@ func rotate(x, y, theta float64) (rx, ry float64) {
 	rx = x*math.Cos(theta) - y*math.Sin(theta)
 	ry = x*math.Sin(theta) + y*math.Cos(theta)
 	return
+}
+
+func ImageToRGBA(src image.Image) *image.RGBA {
+	return imageToRGBA(src)
+}
+
+func UniformRGBA(r image.Rectangle, c color.Color) *image.RGBA {
+	return uniformRGBA(r, c)
 }
 
 func imageToRGBA(src image.Image) *image.RGBA {

@@ -1,4 +1,35 @@
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+art
+art.exe
+
+# Test binaries and profiles
+*.test
+*.out
+*.prof
+cpu.pprof
+mem.pprof
+
+# Generated output images in root directory
 /*.png
+/*.jpg
+/*.jpeg
 /*.svg
 /*.gif
+!examples/*.png
+!examples/*.jpg
 
+# Development and OS files
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.swp
+*~

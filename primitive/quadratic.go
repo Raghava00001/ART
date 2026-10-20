@@ -2,6 +2,7 @@ package primitive
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/fogleman/gg"
@@ -18,13 +19,15 @@ type Quadratic struct {
 
 func NewRandomQuadratic(worker *Worker) *Quadratic {
 	rnd := worker.Rnd
-	x1 := rnd.Float64() * float64(worker.W)
-	y1 := rnd.Float64() * float64(worker.H)
-	x2 := x1 + rnd.Float64()*40 - 20
-	y2 := y1 + rnd.Float64()*40 - 20
-	x3 := x2 + rnd.Float64()*40 - 20
-	y3 := y2 + rnd.Float64()*40 - 20
-	width := 1.0 / 2
+	x1, y1 := worker.SamplePositionFloat()
+	scale := worker.FeatureScaleFactor(int(x1), int(y1))
+	span := math.Max(8.0, 40.0*scale)
+	half := span / 2
+	x2 := x1 + rnd.Float64()*span - half
+	y2 := y1 + rnd.Float64()*span - half
+	x3 := x2 + rnd.Float64()*span - half
+	y3 := y2 + rnd.Float64()*span - half
+	width := math.Max(0.5, (rnd.Float64()*2.0+0.5)*scale)
 	q := &Quadratic{worker, x1, y1, x2, y2, x3, y3, width}
 	q.Mutate()
 	return q
@@ -33,7 +36,7 @@ func NewRandomQuadratic(worker *Worker) *Quadratic {
 func (q *Quadratic) Draw(dc *gg.Context, scale float64) {
 	dc.MoveTo(q.X1, q.Y1)
 	dc.QuadraticTo(q.X2, q.Y2, q.X3, q.Y3)
-	dc.SetLineWidth(q.Width * scale)
+	dc.SetLineWidth(q.Width)
 	dc.Stroke()
 }
 
@@ -55,19 +58,21 @@ func (q *Quadratic) Mutate() {
 	w := q.Worker.W
 	h := q.Worker.H
 	rnd := q.Worker.Rnd
+	step := q.Worker.MutationStepFor(16, int(q.X1), int(q.Y1))
+	wStep := math.Max(0.2, q.Worker.MutationStepFor(1.0, int(q.X1), int(q.Y1)))
 	for {
-		switch rnd.Intn(3) {
+		switch rnd.Intn(4) {
 		case 0:
-			q.X1 = clamp(q.X1+rnd.NormFloat64()*16, -m, float64(w-1+m))
-			q.Y1 = clamp(q.Y1+rnd.NormFloat64()*16, -m, float64(h-1+m))
+			q.X1 = clamp(q.X1+rnd.NormFloat64()*step, -m, float64(w-1+m))
+			q.Y1 = clamp(q.Y1+rnd.NormFloat64()*step, -m, float64(h-1+m))
 		case 1:
-			q.X2 = clamp(q.X2+rnd.NormFloat64()*16, -m, float64(w-1+m))
-			q.Y2 = clamp(q.Y2+rnd.NormFloat64()*16, -m, float64(h-1+m))
+			q.X2 = clamp(q.X2+rnd.NormFloat64()*step, -m, float64(w-1+m))
+			q.Y2 = clamp(q.Y2+rnd.NormFloat64()*step, -m, float64(h-1+m))
 		case 2:
-			q.X3 = clamp(q.X3+rnd.NormFloat64()*16, -m, float64(w-1+m))
-			q.Y3 = clamp(q.Y3+rnd.NormFloat64()*16, -m, float64(h-1+m))
+			q.X3 = clamp(q.X3+rnd.NormFloat64()*step, -m, float64(w-1+m))
+			q.Y3 = clamp(q.Y3+rnd.NormFloat64()*step, -m, float64(h-1+m))
 		case 3:
-			q.Width = clamp(q.Width+rnd.NormFloat64(), 1, 16)
+			q.Width = clamp(q.Width+rnd.NormFloat64()*wStep, 0.5, 16)
 		}
 		if q.Valid() {
 			break

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ART Studio — Geometric Vector Art Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=antigravity_v9_refine">
+</head>
+<body>
+  <!-- Ambient Interactive Particle Stardust (Antigravity Liftoff Atmosphere) -->
+  <canvas id="ambient-particles" class="ambient-particles"></canvas>
+
+  <div class="app-container">
+    <!-- Top Studio Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand-mark" title="ART Studio v2.0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <defs>
+              <linearGradient id="prism-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#4285F4"/>
+                <stop offset="35%" stop-color="#A142F4"/>
+                <stop offset="70%" stop-color="#EA4335"/>
+                <stop offset="100%" stop-color="#FBBC04"/>
+              </linearGradient>
+            </defs>
+            <path d="M12 2L2 21H22L12 2Z" stroke="url(#prism-grad)" stroke-width="2.2" stroke-linejoin="round" fill="rgba(255,255,255,0.03)"/>
+            <circle cx="12" cy="14.5" r="3" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="brand-title-wrap">
+          <span class="brand-name">ART STUDIO</span>
+          <span class="brand-divider">/</span>
+          <span class="brand-desc">Geometric Vector Atelier</span>
+        </div>
+      </div>
+      
+      <div class="header-center">
+        <div class="studio-announcement-pill">
+          <span class="announcement-sparkle">✦</span>
+          <span class="breadcrumb-item active" id="header-mode-display">Mode: Triangles</span>
+          <span class="breadcrumb-sep">•</span>
+          <span class="breadcrumb-item" id="header-res-display">384px Grid</span>
+          <span class="breadcrumb-sep">•</span>
+          <span class="breadcrumb-item" id="header-pyramid-display">Pyramid On</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Theme Toggle (Dark / Light) -->
+        <button id="btn-theme-toggle" class="header-icon-btn" title="Toggle Light / Dark Mode">
+          <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon hidden" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <button id="btn-shortcuts-modal" class="header-icon-btn" title="Keyboard Shortcuts (?)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span class="kbd-hint">?</span>
+        </button>
+
+        <div class="engine-status-pill" id="engine-status-pill">
+          <span class="status-indicator-dot"></span>
+          <span class="status-indicator-text" id="engine-status-text">Engine Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="app-main">
+      <!-- Left Sidebar: Controls & Settings -->
+      <aside class="controls-panel">
+        <div class="sidebar-scrollable-content">
+          <!-- Source Input Card -->
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-label">Source Reference</span>
+              <span class="card-badge" id="source-res-badge">None</span>
+            </div>
+
+            <!-- Drop zone state (shown when no image) -->
+            <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Upload reference image">
+              <input type="file" id="file-input" accept="image/*" class="file-input-hidden">
+              <div class="drop-content" id="drop-content">
+                <div class="drop-icon-box">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <p class="drop-main-text">Drop image or <span class="browse-link">browse</span></p>
+                <span class="drop-sub-text">PNG, JPG, WebP</span>
+              </div>
+            </div>
+
+            <!-- Loaded Reference Card (shown when image exists) -->
+            <div class="reference-card hidden" id="reference-card">
+              <div class="reference-thumb-wrap">
+                <img id="source-preview" class="source-preview" alt="Reference preview">
+              </div>
+              <div class="reference-info">
+                <div class="reference-details">
+                  <span class="reference-dims font-mono" id="reference-dims">896 × 1200 px</span>
+                  <span class="reference-aspect font-mono" id="reference-aspect">Aspect 1:1.33</span>
+                </div>
+                <!-- Extracted Color Palette Swatches -->
+                <div class="palette-swatches-wrap" title="Dominant Palette (Click color to copy hex)">
+                  <div class="palette-swatches" id="palette-swatches">
+                    <!-- Swatches generated dynamically in JS -->
+                  </div>
+                </div>
+                <button id="btn-change-image" class="btn btn-secondary btn-xs btn-change-img">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  Replace
+                </button>
+              </div>
+            </div>
+
+            <button id="btn-load-sample" class="btn btn-secondary btn-full" style="margin-top: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              Load Sample Reference
+            </button>
+          </div>
+
+          <!-- Curated Style Presets -->
+          <div class="panel-card presets-card">
+            <div class="card-header">
+              <span class="card-label">Curated Presets</span>
+              <span class="card-meta">One-Touch Recipes</span>
+            </div>
+            <div class="presets-row" id="presets-row">
+              <button class="preset-pill active" data-preset="mosaic" title="Triangles, 220 shapes, multi-scale pyramid">
+                <span class="preset-dot" style="background: #e0823d;"></span>
+                Geometric Mosaic
+              </button>
+              <button class="preset-pill" data-preset="curves" title="Variable Béziers, 180 shapes">
+                <span class="preset-dot" style="background: #f59e0b;"></span>
+                Fluid Béziers
+              </button>
+              <button class="preset-pill" data-preset="cubic" title="4-Point Cubic Béziers, 200 shapes">
+                <span class="preset-dot" style="background: #e11d48;"></span>
+                Cubic Ribbons
+              </button>
+              <button class="preset-pill" data-preset="minimal" title="Rectangles & circles, 90 shapes, bold opacity">
+                <span class="preset-dot" style="background: #10b981;"></span>
+                Minimalist
+              </button>
+              <button class="preset-pill" data-preset="fidelity" title="Combo shapes, 350 budget, deep refinement">
+                <span class="preset-dot" style="background: #d97706;"></span>
+                High Fidelity
+              </button>
+            </div>
+          </div>
+
+          <!-- Primitive Geometry Modes -->
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-label">Primitive Geometry</span>
+              <span class="card-meta">10 Primitives</span>
+            </div>
+            <div class="mode-grid" id="mode-grid" role="radiogroup" aria-label="Primitive Shape Selection">
+              <button class="mode-chip active" data-mode="1" role="radio" aria-checked="true">
+                <span class="mode-icon">▲</span>
+                <span class="mode-title">Triangles</span>
+                <span class="mode-kbd">1</span>
+              </button>
+              <button class="mode-chip" data-mode="6" role="radio" aria-checked="false">
+                <span class="mode-icon">〜</span>
+                <span class="mode-title">Béziers</span>
+                <span class="mode-kbd">2</span>
+              </button>
+              <button class="mode-chip" data-mode="9" role="radio" aria-checked="false">
+                <span class="mode-icon">∿</span>
+                <span class="mode-title">Cubic Bézier</span>
+                <span class="mode-kbd">3</span>
+              </button>
+              <button class="mode-chip" data-mode="2" role="radio" aria-checked="false">
+                <span class="mode-icon">■</span>
+                <span class="mode-title">Rectangles</span>
+                <span class="mode-kbd">4</span>
+              </button>
+              <button class="mode-chip" data-mode="3" role="radio" aria-checked="false">
+                <span class="mode-icon">⬭</span>
+                <span class="mode-title">Ellipses</span>
+                <span class="mode-kbd">5</span>
+              </button>
+              <button class="mode-chip" data-mode="4" role="radio" aria-checked="false">
+                <span class="mode-icon">●</span>
+                <span class="mode-title">Circles</span>
+                <span class="mode-kbd">6</span>
+              </button>
+              <button class="mode-chip" data-mode="5" role="radio" aria-checked="false">
+                <span class="mode-icon">◆</span>
+                <span class="mode-title">Rot. Rect</span>
+                <span class="mode-kbd">7</span>
+              </button>
+              <button class="mode-chip" data-mode="7" role="radio" aria-checked="false">
+                <span class="mode-icon">⬬</span>
+                <span class="mode-title">Rot. Ellipse</span>
+                <span class="mode-kbd">8</span>
+              </button>
+              <button class="mode-chip" data-mode="8" role="radio" aria-checked="false">
+                <span class="mode-icon">⬡</span>
+                <span class="mode-title">Polygons</span>
+                <span class="mode-kbd">9</span>
+              </button>
+              <button class="mode-chip" data-mode="0" role="radio" aria-checked="false">
+                <span class="mode-icon">✦</span>
+                <span class="mode-title">Combo All</span>
+                <span class="mode-kbd">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Synthesis Engine Controls -->
+          <div class="panel-card">
+            <div class="card-header">
+              <span class="card-label">Synthesis Engine</span>
+              <span class="card-meta">Fine Tuning</span>
+            </div>
+            
+            <div class="slider-field">
+              <div class="field-meta">
+                <label for="input-count">Vector Detail (Shapes)</label>
+                <span class="field-value font-mono" id="val-count">220</span>
+              </div>
+              <input type="range" id="input-count" min="10" max="600" step="10" value="220" class="studio-slider">
+            </div>
+
+            <div class="slider-field">
+              <div class="field-meta">
+                <label for="input-alpha">Stroke Opacity</label>
+                <span class="field-value font-mono" id="val-alpha">128</span>
+              </div>
+              <input type="range" id="input-alpha" min="10" max="255" step="1" value="128" class="studio-slider">
+            </div>
+
+            <div class="slider-field">
+              <div class="field-meta">
+                <label for="input-repeat">Search Depth</label>
+                <span class="field-value font-mono" id="val-repeat">1</span>
+              </div>
+              <input type="range" id="input-repeat" min="0" max="5" step="1" value="1" class="studio-slider">
+            </div>
+
+            <div class="slider-field">
+              <div class="field-meta">
+                <label for="input-res">Sampling Grid</label>
+                <span class="field-value font-mono" id="val-res">384px</span>
+              </div>
+              <input type="range" id="input-res" min="128" max="768" step="64" value="384" class="studio-slider">
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-text">
+                <span class="toggle-name">Multi-Scale Refinement</span>
+                <span class="toggle-hint">Preserves drapery & edge details</span>
+              </div>
+              <label class="studio-switch" aria-label="Toggle Pyramid Synthesis">
+                <input type="checkbox" id="toggle-pyramid" checked>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Sidebar Action Dock (Always Visible) -->
+        <div class="action-dock sticky-action-dock">
+          <button id="btn-start" class="btn btn-action-start">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>Start Synthesis</span>
+            <span class="btn-kbd">↵</span>
+          </button>
+          <button id="btn-stop" class="btn btn-action-stop hidden">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12"/>
+            </svg>
+            <span>Stop Synthesis</span>
+            <span class="btn-kbd">↵</span>
+          </button>
+          <button id="btn-refine" class="btn btn-action-refine hidden" title="Add 50 additional detail shapes to current vector art">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="16"></line>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <span id="btn-refine-text">+50 Detail Shapes</span>
+            <span class="btn-kbd">⇧↵</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Right Main: Live Viewport & Visualization -->
+      <section class="viewport-section">
+        <!-- Live Precision Status & Fidelity Ribbon (Antigravity Style) -->
+        <div class="metrics-bar">
+          <!-- Progress pill -->
+          <div class="metric-block metric-block-progress">
+            <div class="progress-track-wrapper">
+              <div class="progress-track">
+                <div class="progress-fill" id="progress-bar-fill"></div>
+              </div>
+              <span class="metric-num font-mono" id="metric-shapes">0 / 220</span>
+            </div>
+          </div>
+
+          <div class="metric-divider"></div>
+
+          <!-- Visual Match & Fidelity Indicator -->
+          <div class="metric-block metric-block-fidelity">
+            <span class="fidelity-pill" id="fidelity-pill" title="Visual similarity score based on root-mean-square color delta">
+              <span class="fidelity-sparkle">✦</span>
+              <span class="fidelity-value" id="metric-fidelity">Ready</span>
+            </span>
+            <span class="metric-loss-sub font-mono" id="metric-score" title="Raw RMSE Loss">RMSE 0.000</span>
+          </div>
+
+          <div class="metric-divider"></div>
+
+          <!-- Speed & Benchmark -->
+          <div class="metric-block metric-block-stats">
+            <span class="metric-heading">Speed</span>
+            <span class="metric-num font-mono" id="metric-speed">0 /s</span>
+          </div>
+
+          <div class="metric-divider"></div>
+
+          <!-- Elapsed Duration -->
+          <div class="metric-block metric-block-stats">
+            <span class="metric-heading">Elapsed</span>
+            <span class="metric-num font-mono" id="metric-time">0.0s</span>
+          </div>
+
+          <!-- Export Actions -->
+          <div class="metrics-actions">
+            <button id="btn-copy-svg" class="btn btn-secondary btn-compact" title="Copy Raw SVG Code to Clipboard">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copy-btn-text">Copy SVG</span>
+            </button>
+
+            <button id="btn-export-anim" class="btn btn-secondary btn-compact" title="Download Animated SVG Timelapse">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              <span>Animated SVG</span>
+            </button>
+
+            <button id="btn-export-png" class="btn btn-secondary btn-compact" title="Download High-Res PNG">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              PNG
+            </button>
+            <button id="btn-export-svg" class="btn btn-secondary btn-compact" title="Download Vector SVG">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 22 22 22"/>
+              </svg>
+              Vector SVG
+            </button>
+            <button id="btn-export-4k" class="btn btn-accent btn-compact" title="Export Ultra-HD 4K & Museum Print Master (3840px / 5000px @ 300 DPI)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span>✦ 4K Print</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Stage with Interactive Split-Wipe Comparison -->
+        <div class="canvas-stage" id="canvas-stage">
+          <!-- Floating Canvas Utility Bar (Zoom & View Mode) -->
+          <div class="canvas-floating-toolbar">
+            <button class="canvas-tool-toggle" id="btn-toggle-brush" title="Detail Focus Brush (Paint over curtains/face to prioritize shapes)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"></path>
+                <circle cx="5" cy="19" r="2"></circle>
+              </svg>
+            </button>
+            <button class="canvas-tool-toggle" id="btn-toggle-wireframe" title="Toggle Blueprint / Wireframe Mode">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </button>
+            <div class="canvas-toolbar-sep"></div>
+            <div class="zoom-controls">
+              <button class="zoom-btn" id="btn-zoom-out" title="Zoom Out (−)">−</button>
+              <span class="zoom-display font-mono" id="zoom-level-text">100%</span>
+              <button class="zoom-btn" id="btn-zoom-in" title="Zoom In (+)">+</button>
+              <button class="zoom-btn zoom-fit-btn" id="btn-zoom-fit" title="Fit Canvas to Viewport">Fit</button>
+            </div>
+            <div class="canvas-toolbar-sep"></div>
+            <button class="canvas-tool-toggle" id="btn-toggle-grid" title="Toggle Transparency Checkerboard">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+            <button class="canvas-tool-toggle" id="btn-toggle-texture" title="Live Tactile Texture (Clean Vector / Fine Paper / Oil Canvas)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                <path d="M2 12h20"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Focus Brush Sub-Toolbar (Active when brush selected) -->
+          <div class="brush-toolbar hidden" id="brush-toolbar">
+            <span class="brush-label">Focus Brush:</span>
+            <input type="range" id="brush-size" min="10" max="90" value="35" class="brush-slider" title="Brush Radius">
+            <span class="brush-val font-mono" id="brush-size-val">35px</span>
+            <button id="btn-clear-mask" class="btn btn-secondary btn-xs">Clear Mask</button>
+            <span class="brush-hint">Paint over curtains or face to force vector detail</span>
+          </div>
+
+          <!-- Obsidian Canvas Wrapper (Floating Card) -->
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <!-- Vector Canvas Layer (Base) -->
+            <svg id="vector-canvas" class="vector-canvas" preserveAspectRatio="xMidYMid meet">
+            </svg>
+
+            <!-- Interactive Wipe / Split Reference Layer -->
+            <div class="wipe-overlay" id="wipe-overlay">
+              <img id="split-img" class="split-img" alt="Reference Image">
+            </div>
+
+            <!-- Error Delta Heatmap Canvas Layer -->
+            <canvas id="heatmap-canvas" class="heatmap-canvas hidden"></canvas>
+
+            <!-- Priority Focus Mask Canvas (Drawn by user) -->
+            <canvas id="mask-canvas" class="mask-canvas"></canvas>
+
+            <!-- Draggable Wipe Handle Divider -->
+            <div class="wipe-handle-line" id="wipe-handle" title="Drag to compare Reference vs Vector">
+              <div class="wipe-handle-grip">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Overlay Comparison Labels -->
+            <div class="compare-tag compare-tag-left" id="tag-ref">Reference</div>
+            <div class="compare-tag compare-tag-right" id="tag-vec">Synthesized Vector</div>
+
+            <!-- Empty State Layer -->
+            <div class="empty-state" id="empty-state">
+              <div class="empty-icon-wrap">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <polygon points="12 2 2 22 22 22"/>
+                  <circle cx="12" cy="15" r="3"/>
+                </svg>
+              </div>
+              <h2 class="empty-title">Ready to Synthesize</h2>
+              <p class="empty-desc">Drop an image or click <strong>Load Sample Reference</strong> on the sidebar to begin autonomous vector synthesis.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Stage Footer & Comparison Mode Dock (Antigravity Style) -->
+        <footer class="stage-footer">
+          <div class="floating-stage-dock">
+            <div class="footer-status">
+              <span class="status-pulse-dot"></span>
+              <span id="status-hint">System ready.</span>
+            </div>
+
+            <!-- Interactive Timeline Scrubber & Replay Bar -->
+            <div class="timeline-scrubber-wrap hidden" id="timeline-scrubber-wrap">
+              <button class="timeline-play-btn" id="btn-timeline-play" title="Play/Pause Replay">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </button>
+              <input type="range" id="timeline-slider" min="1" max="220" value="220" class="timeline-slider" title="Scrub through generation frames">
+              <span class="timeline-step-text font-mono" id="timeline-step-text">220 / 220</span>
+            </div>
+
+            <div class="footer-center-hint">
+              <span class="footer-kbd-tag"><kbd>Space</kbd> View</span>
+              <span class="footer-kbd-tag"><kbd>1–9</kbd> Mode</span>
+              <span class="footer-kbd-tag"><kbd>↵</kbd> Synthesize</span>
+            </div>
+
+            <div class="comparison-toolbar">
+              <div class="segmented-control" id="view-mode-control">
+                <button class="segment-btn active" data-view="split" title="Interactive Split Wipe">Split Wipe</button>
+                <button class="segment-btn" data-view="vector" title="Vector Output Only">Vector Only</button>
+                <button class="segment-btn" data-view="reference" title="Reference Image Only">Reference</button>
+                <button class="segment-btn" data-view="heatmap" title="Error Delta Heatmap (Shows remaining reconstruction error)">Delta Heatmap</button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <!-- Keyboard Shortcuts Modal Dialog -->
+  <dialog class="studio-modal" id="shortcuts-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+            <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"></path>
+          </svg>
+          <h3>Studio Keyboard Shortcuts</h3>
+        </div>
+        <button class="modal-close-btn" id="btn-close-modal" aria-label="Close dialog">✕</button>
+      </div>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Start or Stop synthesis</span>
+          <kbd class="shortcut-key">Enter</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Toggle Split Wipe vs Vector View</span>
+          <kbd class="shortcut-key">Space</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Nudge Wipe divider position</span>
+          <div class="shortcut-keys"><kbd class="shortcut-key">←</kbd> <kbd class="shortcut-key">→</kbd></div>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Switch Primitive Shape mode</span>
+          <div class="shortcut-keys"><kbd class="shortcut-key">1</kbd>–<kbd class="shortcut-key">9</kbd>, <kbd class="shortcut-key">0</kbd></div>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Detail Focus Brush</span>
+          <kbd class="shortcut-key">B</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Blueprint Wireframe Mode</span>
+          <kbd class="shortcut-key">W</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Copy Raw SVG Vector code</span>
+          <kbd class="shortcut-key">C</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Load Sample Reference</span>
+          <kbd class="shortcut-key">R</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">+50 Detail Shapes (Iterative Continuation)</span>
+          <div class="shortcut-keys"><kbd class="shortcut-key">Shift</kbd> <kbd class="shortcut-key">Enter</kbd></div>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Toggle Error Delta Heatmap</span>
+          <kbd class="shortcut-key">H</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Cycle Tactile Texture (Paper / Linen)</span>
+          <kbd class="shortcut-key">T</kbd>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Zoom Canvas in / out / fit</span>
+          <div class="shortcut-keys"><kbd class="shortcut-key">+</kbd> <kbd class="shortcut-key">−</kbd> <kbd class="shortcut-key">0</kbd></div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Ultra-HD 4K Print Master Dialog -->
+  <dialog class="studio-modal" id="export-modal">
+    <div class="modal-card export-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="badge-icon-wrap" style="color: var(--accent-coral);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">Ultra-HD Print Master</h3>
+            <span style="font-size: 0.6875rem; color: var(--text-tertiary);">Vector Rasterization Engine · 300 DPI Fine Art</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="btn-close-export-modal" aria-label="Close dialog">✕</button>
+      </div>
+
+      <div class="export-modal-body">
+        <!-- Resolution Selection -->
+        <div class="export-section">
+          <label class="export-section-label">Master Resolution</label>
+          <div class="export-grid-options" id="export-res-options">
+            <button class="export-option-card active" data-res="4k" data-size="3840">
+              <div class="opt-top">
+                <span class="export-opt-title">4K UHD Master</span>
+                <span class="badge-mini">✦ Recommended</span>
+              </div>
+              <span class="export-opt-dims font-mono">3840 px · 300 DPI</span>
+              <span class="export-opt-meta">Wall posters, 4K displays & portfolios</span>
+            </button>
+            <button class="export-option-card" data-res="print" data-size="5000">
+              <div class="opt-top">
+                <span class="export-opt-title">Gallery Poster</span>
+              </div>
+              <span class="export-opt-dims font-mono">5000 px · 300 DPI</span>
+              <span class="export-opt-meta">Large-format physical art printing</span>
+            </button>
+            <button class="export-option-card" data-res="2k" data-size="2048">
+              <div class="opt-top">
+                <span class="export-opt-title">2K Retina</span>
+              </div>
+              <span class="export-opt-dims font-mono">2048 px · High-DPI</span>
+              <span class="export-opt-meta">Digital presentations & web showcases</span>
+            </button>
+            <button class="export-option-card" data-res="8k" data-size="7680">
+              <div class="opt-top">
+                <span class="export-opt-title">8K Archival</span>
+              </div>
+              <span class="export-opt-dims font-mono">7680 px · Exhibition</span>
+              <span class="export-opt-meta">Maximum museum-grade archival fidelity</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Artisan Texture Finish -->
+        <div class="export-section">
+          <label class="export-section-label">Tactile Texture Finish</label>
+          <div class="export-pills" id="export-texture-options">
+            <button class="export-pill active" data-texture="none">Pure Vector (Sharp)</button>
+            <button class="export-pill" data-texture="paper">Fine Art Paper Grain</button>
+            <button class="export-pill" data-texture="canvas">Oil Canvas Weave</button>
+          </div>
+        </div>
+
+        <!-- Presentation Mat Border -->
+        <div class="export-section">
+          <label class="export-mat-toggle">
+            <input type="checkbox" id="export-gallery-mat">
+            <div class="toggle-track">
+              <div class="toggle-thumb"></div>
+            </div>
+            <div class="toggle-label-wrap">
+              <span class="toggle-main">Obsidian Gallery Passe-Partout Mat</span>
+              <span class="toggle-sub">Adds an elegant 4% deep border framing the artwork</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Live Dimensions & Print Specs -->
+        <div class="export-preview-spec">
+          <div class="spec-row">
+            <span class="spec-label">Pixel Dimension</span>
+            <span class="spec-val font-mono" id="export-spec-dims">3840 × 5140 px</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-label">Physical Size (@ 300 DPI)</span>
+            <span class="spec-val font-mono" id="export-spec-physical">12.8 × 17.1 in · 32.5 × 43.5 cm</span>
+          </div>
+          <div class="spec-row">
+            <span class="spec-label">Color Space & Depth</span>
+            <span class="spec-val font-mono">sRGB 32-bit Lossless PNG</span>
+          </div>
+        </div>
+
+        <!-- Download Action Button -->
+        <button id="btn-do-export-master" class="btn btn-primary btn-full btn-lg">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span id="export-submit-text">Download 4K UHD Master (PNG)</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Hardware-Accelerated Procedural SVG Texture Filters -->
+  <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+    <defs>
+      <!-- Museum Fine Art Cotton Paper -->
+      <filter id="art-filter-paper" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="noise" />
+        <feDiffuseLighting in="noise" lighting-color="#ffffff" surfaceScale="1.15" result="light">
+          <feDistantLight azimuth="45" elevation="60" />
+        </feDiffuseLighting>
+        <feBlend mode="multiply" in="SourceGraphic" in2="light" />
+      </filter>
+
+      <!-- Stretched Oil Canvas Weave -->
+      <filter id="art-filter-canvas" x="0%" y="0%" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.32 0.32" numOctaves="2" result="noise" />
+        <feDiffuseLighting in="noise" lighting-color="#ffffff" surfaceScale="1.7" result="light">
+          <feDistantLight azimuth="60" elevation="50" />
+        </feDiffuseLighting>
+        <feBlend mode="multiply" in="SourceGraphic" in2="light" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Sonner-style Lightweight Toast Notification Shelf -->
+  <div class="toast-shelf" id="toast-shelf" aria-live="polite"></div>
+
+  <script src="app.js?v=antigravity_v9_refine"></script>
+</body>
+</html>

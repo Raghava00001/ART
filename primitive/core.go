@@ -122,3 +122,63 @@ func differencePartial(target, before, after *image.RGBA, score float64, lines [
 	}
 	return math.Sqrt(float64(total)/float64(w*h*4)) / 255
 }
+
+func differencePartialSaliency(target, before, after *image.RGBA, score float64, lines []Scanline, sm *SaliencyMap) float64 {
+	if sm == nil || len(sm.Values) == 0 {
+		return differencePartial(target, before, after, score, lines)
+	}
+	size := target.Bounds().Size()
+	w, h := size.X, size.Y
+	total := uint64(math.Pow(score*255, 2) * float64(w*h*4))
+	for _, line := range lines {
+		y := line.Y
+		if y < 0 || y >= h {
+			continue
+		}
+		row := y * w
+		i := target.PixOffset(line.X1, y)
+		for x := line.X1; x <= line.X2; x++ {
+			tr := int(target.Pix[i])
+			tg := int(target.Pix[i+1])
+			tb := int(target.Pix[i+2])
+			ta := int(target.Pix[i+3])
+			br := int(before.Pix[i])
+			bg := int(before.Pix[i+1])
+			bb := int(before.Pix[i+2])
+			ba := int(before.Pix[i+3])
+			ar := int(after.Pix[i])
+			ag := int(after.Pix[i+1])
+			ab := int(after.Pix[i+2])
+			aa := int(after.Pix[i+3])
+			i += 4
+
+			dr1 := tr - br
+			dg1 := tg - bg
+			db1 := tb - bb
+			da1 := ta - ba
+			dr2 := tr - ar
+			dg2 := tg - ag
+			db2 := tb - ab
+			da2 := ta - aa
+
+			var mult uint64 = 1
+			if row+x < len(sm.Values) {
+				s := sm.Values[row+x]
+				if s > 0.10 {
+					mult = 1 + uint64(s*s*30.0)
+				}
+			}
+
+			diff1 := uint64(dr1*dr1+dg1*dg1+db1*db1+da1*da1) * mult
+			diff2 := uint64(dr2*dr2+dg2*dg2+db2*db2+da2*da2) * mult
+
+			if diff1 > total {
+				total = 0
+			} else {
+				total -= diff1
+			}
+			total += diff2
+		}
+	}
+	return math.Sqrt(float64(total)/float64(w*h*4)) / 255
+}

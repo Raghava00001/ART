@@ -2,6 +2,7 @@ package primitive
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/fogleman/gg"
@@ -19,11 +20,13 @@ func NewRandomPolygon(worker *Worker, order int, convex bool) *Polygon {
 	rnd := worker.Rnd
 	x := make([]float64, order)
 	y := make([]float64, order)
-	x[0] = rnd.Float64() * float64(worker.W)
-	y[0] = rnd.Float64() * float64(worker.H)
+	x[0], y[0] = worker.SamplePositionFloat()
+	scale := worker.FeatureScaleFactor(int(x[0]), int(y[0]))
+	span := math.Max(8.0, 40.0*scale)
+	half := span / 2
 	for i := 1; i < order; i++ {
-		x[i] = x[0] + rnd.Float64()*40 - 20
-		y[i] = y[0] + rnd.Float64()*40 - 20
+		x[i] = x[0] + rnd.Float64()*span - half
+		y[i] = y[0] + rnd.Float64()*span - half
 	}
 	p := &Polygon{worker, order, convex, x, y}
 	p.Mutate()
@@ -65,6 +68,11 @@ func (p *Polygon) Mutate() {
 	w := p.Worker.W
 	h := p.Worker.H
 	rnd := p.Worker.Rnd
+	x0, y0 := 0, 0
+	if len(p.X) > 0 {
+		x0, y0 = int(p.X[0]), int(p.Y[0])
+	}
+	step := p.Worker.MutationStepFor(16, x0, y0)
 	for {
 		if rnd.Float64() < 0.25 {
 			i := rnd.Intn(p.Order)
@@ -72,8 +80,8 @@ func (p *Polygon) Mutate() {
 			p.X[i], p.Y[i], p.X[j], p.Y[j] = p.X[j], p.Y[j], p.X[i], p.Y[i]
 		} else {
 			i := rnd.Intn(p.Order)
-			p.X[i] = clamp(p.X[i]+rnd.NormFloat64()*16, -m, float64(w-1+m))
-			p.Y[i] = clamp(p.Y[i]+rnd.NormFloat64()*16, -m, float64(h-1+m))
+			p.X[i] = clamp(p.X[i]+rnd.NormFloat64()*step, -m, float64(w-1+m))
+			p.Y[i] = clamp(p.Y[i]+rnd.NormFloat64()*step, -m, float64(h-1+m))
 		}
 		if p.Valid() {
 			break

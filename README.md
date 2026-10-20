@@ -1,159 +1,189 @@
-# Primitive Pictures
+# ART — Autonomous Geometric Vector Art Engine
 
-Reproducing images with geometric primitives.
+[![Go Report Card](https://goreportcard.com/badge/github.com/art/primitive)](https://goreportcard.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+[![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success.svg)](SECURITY.md)
+[![Go Version](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go)](go.mod)
+[![Architecture](https://img.shields.io/badge/Binary-Zero--Dependency%20Embedded-brightgreen.svg)](#installation--build)
 
-![Example](https://www.michaelfogleman.com/static/primitive/examples/16550611738.200.128.4.5.png)
+**ART** is a high-performance vector synthesis engine that reproduces raster images using intelligent geometric and calligraphic primitives. Engineered with residual error heatmaps, multi-resolution annealing pyramids, and an interactive glassmorphic web atelier.
 
-### How it Works
+---
 
-A target image is provided as input. The algorithm tries to find the single most optimal shape that can be drawn to minimize the error between the target image and the drawn image. It repeats this process, adding *one shape at a time*. Around 50 to 200 shapes are needed to reach a result that is recognizable yet artistic and abstract.
+## Key Features
 
-### Primitive for macOS
+- **Residual-Weighted Importance Sampling**: Shapes spawn preferentially in high-error regions (facial contours, fine edges, subtle textures) using CDF-sampled residual error heatmaps rather than wasting compute cycles on uniform backgrounds.
+- **Enhanced Bézier & Spline Engine**:
+  - **Mode 6 (Variable Béziers)**: Quadratic curves with dynamic stroke widths (0.5–16px) for expressive, calligraphic brushwork.
+  - **Mode 9 (Cubic Béziers)**: 4-control-point cubic curves enabling smooth S-curves, organic silhouettes, and fine strands.
+- **Coarse-to-Fine Multi-Resolution Pyramid**: Accelerates macro convergence at low resolution (64px) before progressively refining midrange (128px) and high-frequency details (256–512px).
+- **ART Studio (Interactive Web Atelier)**: A glassmorphic dark-mode web studio featuring real-time Server-Sent Events (SSE) streaming, interactive wipe comparison, manual priority brushing, and instant SVG/PNG/4K master exports.
+- **Zero-Dependency Single Binary**: Using Go's `embed.FS`, all web assets, stylesheets, scripts, and sample artwork are compiled directly into a single portable binary.
+- **Hardened Upload Security**: Comprehensive defense-in-depth security including decompression bomb mitigation, magic-byte MIME sniffing, strict 20MB request caps, parameter clamping, and zero disk persistence. Check out [SECURITY.md](SECURITY.md) for details.
 
-Now available as a native Mac application!
+---
 
-https://primitive.lol/
+## Architecture Overview
 
-### Twitter
-
-Follow [@PrimitivePic](https://twitter.com/PrimitivePic) on Twitter to see a new primitive picture every 30 minutes!
-
-The Twitter bot looks for interesting photos using the Flickr API, runs the algorithm using randomized parameters, and
-posts the picture using the Twitter API.
-
-You can tweet a picture to the bot and it will process it for you.
-
-### Command-line Usage
-
-Run it on your own images! First, [install Go](https://golang.org/doc/install).
-
-    go get -u github.com/fogleman/primitive
-    primitive -i input.png -o output.png -n 100
-
-Small input images should be used (like 256x256px). You don't need the detail anyway and the code will run faster.
-
-| Flag | Default | Description |
-| --- | --- | --- |
-| `i` | n/a | input file |
-| `o` | n/a | output file |
-| `n` | n/a | number of shapes |
-| `m` | 1 | mode: 0=combo, 1=triangle, 2=rect, 3=ellipse, 4=circle, 5=rotatedrect, 6=beziers, 7=rotatedellipse, 8=polygon |
-| `rep` | 0 | add N extra shapes each iteration with reduced search (mostly good for beziers) |
-| `nth` | 1 | save every Nth frame (only when `%d` is in output path) |
-| `r` | 256 | resize large input images to this size before processing |
-| `s` | 1024 | output image size |
-| `a` | 128 | color alpha (use `0` to let the algorithm choose alpha for each shape) |
-| `bg` | avg | starting background color (hex) |
-| `j` | 0 | number of parallel workers (default uses all cores) |
-| `v` | off | verbose output |
-| `vv` | off | very verbose output |
-
-### Output Formats
-
-Depending on the output filename extension provided, you can produce different types of output.
-
-- `PNG`: raster output
-- `JPG`: raster output
-- `SVG`: vector output
-- `GIF`: animated output showing shapes being added - requires ImageMagick (specifically the `convert` command)
-
-For PNG and SVG outputs, you can also include `%d`, `%03d`, etc. in the filename. In this case, each frame will be saved separately.
-
-You can use the `-o` flag multiple times. This way you can save both a PNG and an SVG, for example.
-
-### Progression
-
-This GIF demonstrates the iterative nature of the algorithm, attempting to minimize the mean squared error by adding one shape at a time. (Use a ".gif" output file to generate one yourself!)
-
-<img src="https://www.michaelfogleman.com/static/primitive/examples/monalisa.3.2000.gif" width="440"/> <img src="https://www.michaelfogleman.com/static/primitive/examples/monalisa-original.png" width="440"/>
-
-### Static Animation
-
-Since the algorithm has a random component to it, you can run it against the same input image multiple times to bring life to a static image.
-
-![Pencils](https://www.michaelfogleman.com/static/primitive/examples/pencils.gif)
-
-### Creative Constraints
-
-If you're willing to dabble in the code, you can enforce constraints on the shapes to produce even more interesting results. Here, the rectangles are constrained to point toward the sun in this picture of a pyramid sunset.
-
-![Pyramids](https://www.michaelfogleman.com/static/primitive/examples/pyramids.png)
-
-### Shape and Iteration Comparison Matrix
-
-The matrix below shows triangles, ellipses and rectangles at 50, 100 and 200 iterations each.
-
-![Matrix](http://i.imgur.com/H5NYpL4.png)
-
-### How it Works, Part II
-
-Say we have a `Target Image`. This is what we're working towards recreating. We start with a blank canvas, but we fill it with a single solid color. Currently, this is the average color of the `Target Image`. We call this new blank canvas the `Current Image`. Now, we start evaluating shapes. To evaluate a shape, we draw it on top of the `Current Image`, producing a `New Image`. This `New Image` is compared to the `Target Image` to compute a score. We use the [root-mean-square error](https://en.wikipedia.org/wiki/Root-mean-square_deviation) for the score.
-
-    Current Image + Shape => New Image
-    RMSE(New Image, Target Image) => Score
-
-The shapes are generated randomly. We can generate a random shape and score it. Then we can mutate the shape (by tweaking a triangle vertex, tweaking an ellipse radius or center, etc.) and score it again. If the mutation improved the score, we keep it. Otherwise we rollback to the previous state. Repeating this process is known as [hill climbing](https://en.wikipedia.org/wiki/Hill_climbing). Hill climbing is prone to getting stuck in local minima, so we actually do this many different times with several different starting shapes. We can also generate N random shapes and pick the best one before we start hill climbing. [Simulated annealing](https://en.wikipedia.org/wiki/Simulated_annealing) is another good option, but in my tests I found the hill climbing technique just as good and faster, at least for this particular problem.
-
-Once we have found a good-scoring shape, we add it to the `Current Image`, where it will remain unchanged. Then we start the process again to find the next shape to draw. This process is repeated as many times as desired.
-
-### Primitives
-
-The following primitives are supported:
-
-- Triangle
-- Rectangle (axis-aligned)
-- Ellipse (axis-aligned)
-- Circle
-- Rotated Rectangle
-- Combo (a mix of the above in a single image)
-
-More shapes can be added by implementing the following interface:
-
-```go
-type Shape interface {
-	Rasterize() []Scanline
-	Copy() Shape
-	Mutate()
-	Draw(dc *gg.Context)
-	SVG(attrs string) string
-}
+```text
+  ┌─────────────────────────────────────────────────────────┐
+  │                    Input Reference                      │
+  └───────────────────────────┬─────────────────────────────┘
+                              │
+               ┌──────────────▼──────────────┐
+               │ Multi-Resolution Pyramid    │
+               │ (64px ➔ 128px ➔ 256/384px)  │
+               └──────────────┬──────────────┘
+                              │
+       ┌──────────────────────▼──────────────────────┐
+       │ Residual-Weighted Importance Map (CDF)       │
+       │ + Edge Saliency Guidance                    │
+       └──────────────────────┬──────────────────────┘
+                              │
+               ┌──────────────▼──────────────┐
+               │ Concurrent Workers (Hill-   │
+               │ Climbing Stochastic Search) │
+               └──────────────┬──────────────┘
+                              │
+       ┌──────────────────────▼──────────────────────┐
+       │ Primitives (Triangles, Beziers, Cubics...)  │
+       └──────────────────────┬──────────────────────┘
+                              │
+       ┌──────────────────────▼──────────────────────┐
+       │ Outputs: SVG Vector / PNG Raster / GIF /    │
+       │ Real-Time SSE Web Studio Stream             │
+       └─────────────────────────────────────────────┘
 ```
 
-### Features
+---
 
-- [Hill Climbing](https://en.wikipedia.org/wiki/Hill_climbing) or [Simulated Annealing](https://en.wikipedia.org/wiki/Simulated_annealing) for optimization (hill climbing multiple random shapes is nearly as good as annealing and faster)
-- Scanline rasterization of shapes in pure Go (preferable for implementing the features below)
-- Optimal color computation based on affected pixels for each shape (color is directly computed, not optimized for)
-- Partial image difference for faster scoring (only pixels that change need be considered)
-- Anti-aliased output rendering
+## Installation & Build
 
-### Inspiration
+Build the single self-contained `art` binary:
 
-This project was originally inspired by the popular and excellent work of Roger Johansson - [Genetic Programming: Evolution of Mona Lisa](https://rogeralsing.com/2008/12/07/genetic-programming-evolution-of-mona-lisa/). Since seeing that article when it was quite new, I've tinkered with this problem here and there over the years. But only now am I satisfied with my results.
+```bash
+go build -v -o art.exe .
+```
 
-It should be noted that there are significant differences in my implementation compared to Roger's original work. Mine is not a genetic algorithm. Mine only operates on one shape at a time. Mine is much faster (AFAIK) and supports many types of shapes.
+*Note: On macOS and Linux, output binary is `./art`.*
 
-### Examples
+To run the complete test suite:
 
-Here are more examples from interesting photos found on Flickr.
+```bash
+go test -v ./...
+```
 
-![Example](https://www.michaelfogleman.com/static/primitive/examples/29167683201.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/26574286221.200.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/15011768709.200.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/27540729075.200.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/28896874003.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/20414282102.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/15199237095.200.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/11707819764.200.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/18270231645.200.128.4.3.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/15705764893.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/25213252889.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/15015411870.200.128.4.3.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/25766500104.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/27471731151.50.128.4.1.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/11720700033.200.128.4.3.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/18782606664.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/21374478713.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/15196426112.200.128.4.5.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/24696847962.png)
-![Example](https://www.michaelfogleman.com/static/primitive/examples/18276676312.100.128.4.1.png)
+---
+
+## Usage
+
+### 1. Interactive Web Studio
+
+Launch the browser-based studio on any port (default `8080`):
+
+```bash
+art -gui -port 8080
+```
+
+Open `http://localhost:8080` in your browser:
+- **Drag & Drop** any reference image or click the sample portrait to load instantly.
+- **Select Primitives**: Choose from 10 geometric and calligraphic modes.
+- **Priority Brush**: Paint over focal areas (eyes, mouth, signature lines) to concentrate detail.
+- **A/B Split Wipe**: Slide the interactive divider to inspect raster vs. vector accuracy.
+- **Export**: Download crisp scalable SVG vectors, transparent PNGs, or upscaled 4K master prints.
+
+#### Web Studio Keyboard Shortcuts
+
+| Shortcut | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Start / Stop synthesis |
+| <kbd>Shift</kbd> + <kbd>Enter</kbd> | Continue / Refine current artwork |
+| <kbd>Space</kbd> | Toggle Split Wipe / Vector Only view |
+| <kbd>B</kbd> | Toggle Focal Priority Brush |
+| <kbd>W</kbd> | Toggle Wireframe outline mode |
+| <kbd>H</kbd> | Toggle Heatmap error visualization |
+| <kbd>C</kbd> | Copy SVG markup to clipboard |
+| <kbd>R</kbd> | Reload default reference artwork |
+| <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom In / Out / Fit to Canvas |
+| <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd> | Quick-switch primitive modes |
+| <kbd>?</kbd> | Open Shortcuts modal dialog |
+
+---
+
+### 2. Command Line Interface
+
+```bash
+art -i input.jpg -o output.png -n 150 -m 1 -r 256 -pyramid
+```
+
+To generate both a vector SVG and a high-resolution PNG simultaneously:
+
+```bash
+art -i input.jpg -o output.svg -o output.png -n 200 -m 9 -s 2048 -pyramid
+```
+
+#### CLI Options Reference
+
+| Flag | Default | Description |
+|:---|:---|:---|
+| `-i` | *(required)* | Path to input image |
+| `-o` | *(required)* | Path to output image (`.png`, `.jpg`, `.svg`, `.gif`, can be repeated) |
+| `-n` | *(required)* | Total number of primitives to generate |
+| `-m` | `1` | Primitive mode (see table below) |
+| `-pyramid` | `false` | Enable coarse-to-fine multi-resolution pyramid |
+| `-gui` | `false` | Launch interactive web GUI studio |
+| `-port` | `8080` | Web GUI server port |
+| `-r` | `256` | Simulation resolution (higher values capture finer detail) |
+| `-s` | `1024` | Output image render size |
+| `-a` | `128` | Alpha opacity (0–255; `0` enables automatic per-shape alpha) |
+| `-rep` | `0` | Extra shape refinement steps per iteration |
+| `-nth` | `1` | Save every Nth frame when `%d` is in the output path |
+| `-bg` | `""` | Background color hex (defaults to average image color) |
+| `-j` | `0` | Number of parallel worker threads (default uses all CPU cores) |
+| `-v` | `false` | Verbose progress logging |
+| `-vv` | `false` | Extra verbose debugging output |
+
+---
+
+## Primitive Modes
+
+| Mode | Shape Type | Description |
+|:---:|:---|:---|
+| **0** | Combo All | Dynamically mixes all available shapes |
+| **1** | Triangles | Sharp geometric facets; ideal for low-poly portraits & architecture |
+| **2** | Rectangles | Axis-aligned bounding boxes |
+| **3** | Ellipses | Smooth elliptical splats |
+| **4** | Circles | Circular pointillism / bokeh style |
+| **5** | Rotated Rectangles | Oriented rectangular strokes |
+| **6** | Variable Béziers | Quadratic curves with mutable 0.5–16px width for brushwork |
+| **7** | Rotated Ellipses | Tilted ellipses capturing organic curvature |
+| **8** | Polygons | Convex 4-sided polygonal shards |
+| **9** | Cubic Béziers | 4-point cubic spline curves with calligraphic width for hair and contours |
+
+---
+
+## Output Formats
+
+- **Vector SVG (`.svg`)**: Clean, scalable, lossless vector artwork with grouped scale layers.
+- **Raster Image (`.png` / `.jpg`)**: Crisp high-resolution raster output up to 7680px (8K).
+- **Frame Sequence (`frame_%04d.png`)**: Save progressive evolution frame by frame.
+- **Animated GIF (`.gif`)**: Generate animated timelapses illustrating generation from scratch.
+
+---
+
+## Contributing
+
+Contributions, bug reports, and suggestions are welcome!
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/my-feature`).
+3. Ensure all tests pass: `go test -v ./...`.
+4. Commit your changes (`git commit -am 'Add new feature'`).
+5. Push to the branch (`git push origin feature/my-feature`).
+6. Open a Pull Request.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE.md).  
+Original core concept inspired by [Michael Fogleman](https://github.com/fogleman/primitive).

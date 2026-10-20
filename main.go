@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"log"
 	"math/rand"
 	"os"
@@ -12,7 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fogleman/primitive/primitive"
+	"art/primitive"
+	"art/web"
 	"github.com/nfnt/resize"
 )
 
@@ -28,6 +30,9 @@ var (
 	Workers    int
 	Nth        int
 	Repeat     int
+	Pyramid    bool
+	GUI        bool
+	Port       int
 	V, VV      bool
 )
 
@@ -69,10 +74,13 @@ func init() {
 	flag.IntVar(&Alpha, "a", 128, "alpha value")
 	flag.IntVar(&InputSize, "r", 256, "resize large input images to this size")
 	flag.IntVar(&OutputSize, "s", 1024, "output image size")
-	flag.IntVar(&Mode, "m", 1, "0=combo 1=triangle 2=rect 3=ellipse 4=circle 5=rotatedrect 6=beziers 7=rotatedellipse 8=polygon")
+	flag.IntVar(&Mode, "m", 1, "0=combo 1=triangle 2=rect 3=ellipse 4=circle 5=rotatedrect 6=beziers 7=rotatedellipse 8=polygon 9=cubicbeziers")
 	flag.IntVar(&Workers, "j", 0, "number of parallel workers (default uses all cores)")
 	flag.IntVar(&Nth, "nth", 1, "save every Nth frame (put \"%d\" in path)")
 	flag.IntVar(&Repeat, "rep", 0, "add N extra shapes per iteration with reduced search")
+	flag.BoolVar(&Pyramid, "pyramid", false, "enable coarse-to-fine multi-resolution pyramid")
+	flag.BoolVar(&GUI, "gui", false, "launch interactive web GUI studio")
+	flag.IntVar(&Port, "port", 8080, "port for web GUI studio")
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
 }
@@ -91,6 +99,15 @@ func check(err error) {
 func main() {
 	// parse and validate arguments
 	flag.Parse()
+
+	// If GUI mode requested, launch web server directly
+	if GUI {
+		if err := web.StartServer(Port); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	ok := true
 	if Input == "" {
 		ok = errorMessage("ERROR: input argument required")
@@ -112,7 +129,7 @@ func main() {
 		}
 	}
 	if !ok {
-		fmt.Println("Usage: primitive [OPTIONS] -i input -o output -n count")
+		fmt.Println("Usage: art [OPTIONS] -i input -o output -n count")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -138,22 +155,62 @@ func main() {
 	input, err := primitive.LoadImage(Input)
 	check(err)
 
+	rawInput := input
+	var totalShapes int
+	for _, config := range Configs {
+		totalShapes += config.Count
+	}
+
+	type pyramidStage struct {
+		res   int
+		limit int
+	}
+	var stages []pyramidStage
+	if Pyramid && InputSize >= 64 && totalShapes >= 10 {
+		if InputSize >= 256 {
+			s0 := InputSize / 4
+			s1 := InputSize / 2
+			s2 := InputSize
+			stages = []pyramidStage{
+				{s0, totalShapes * 20 / 100},
+				{s1, totalShapes * 50 / 100},
+				{s2, totalShapes},
+			}
+		} else {
+			s0 := InputSize / 2
+			s1 := InputSize
+			stages = []pyramidStage{
+				{s0, totalShapes * 35 / 100},
+				{s1, totalShapes},
+			}
+		}
+	}
+
 	// scale down input image if needed
-	size := uint(InputSize)
-	if size > 0 {
-		input = resize.Thumbnail(size, size, input, resize.Bilinear)
+	var initialInput image.Image
+	currentStageIdx := 0
+	if len(stages) > 0 {
+		initialInput = resize.Thumbnail(uint(stages[0].res), uint(stages[0].res), rawInput, resize.Bilinear)
+		primitive.Log(1, "pyramid enabled: stage 0 at %dpx (shapes 1..%d)\n", stages[0].res, stages[0].limit)
+	} else {
+		size := uint(InputSize)
+		if size > 0 {
+			initialInput = resize.Thumbnail(size, size, rawInput, resize.Bilinear)
+		} else {
+			initialInput = rawInput
+		}
 	}
 
 	// determine background color
 	var bg primitive.Color
 	if Background == "" {
-		bg = primitive.MakeColor(primitive.AverageImageColor(input))
+		bg = primitive.MakeColor(primitive.AverageImageColor(initialInput))
 	} else {
 		bg = primitive.MakeHexColor(Background)
 	}
 
 	// run algorithm
-	model := primitive.NewModel(input, bg, OutputSize, Workers)
+	model := primitive.NewModel(initialInput, bg, OutputSize, Workers)
 	primitive.Log(1, "%d: t=%.3f, score=%.6f\n", 0, 0.0, model.Score)
 	start := time.Now()
 	frame := 0
@@ -162,9 +219,22 @@ func main() {
 			config.Count, config.Mode, config.Alpha, config.Repeat)
 
 		for i := 0; i < config.Count; i++ {
+			// Check if we need to advance pyramid stage
+			if len(stages) > 0 && currentStageIdx+1 < len(stages) && frame >= stages[currentStageIdx].limit {
+				currentStageIdx++
+				nextRes := stages[currentStageIdx].res
+				primitive.Log(1, "transitioning to pyramid stage %d at %dpx (shapes %d..%d)\n",
+					currentStageIdx, nextRes, frame+1, stages[currentStageIdx].limit)
+				nextTarget := resize.Thumbnail(uint(nextRes), uint(nextRes), rawInput, resize.Bilinear)
+				model.SetTarget(nextTarget)
+			}
+
 			frame++
 
 			// find optimal shape and add it to the model
+			if config.Count > 0 {
+				model.SetProgress(float64(frame) / float64(config.Count))
+			}
 			t := time.Now()
 			n := model.Step(primitive.ShapeType(config.Mode), config.Alpha, config.Repeat)
 			nps := primitive.NumberString(float64(n) / time.Since(t).Seconds())
