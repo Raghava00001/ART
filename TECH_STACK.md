@@ -86,6 +86,13 @@ This document provides a comprehensive technical breakdown of the technologies u
   - Hardware-accelerated `backdrop-filter: blur(24px)` for glass panels.
   - CSS Grid and Flexbox for responsive scaling on desktop and mobile.
 
+#### D. WebAssembly (Wasm) & Background Worker Execution
+- **Why**: Allows ART Studio to run at native speed directly inside any modern web browser without requiring a running backend or local Go installation (enabling zero-install deployment on static hosts like GitHub Pages).
+- **How**:
+  - [`cmd/wasm/main.go`](cmd/wasm/main.go) compiles the full Go `primitive` engine into `primitive.wasm` using `GOOS=js GOARCH=wasm`.
+  - [`web/static/worker.js`](web/static/worker.js) boots Go's runtime inside a dedicated background Web Worker, ensuring zero main-thread UI jank.
+  - If a backend Go server is running, the app utilizes multi-core server SSE streaming; if running statically, it seamlessly activates the WebAssembly engine (with an error-guided client hill-climbing optimizer fallback).
+
 ---
 
 ### 4. Algorithmic Innovations
@@ -127,11 +134,15 @@ This document provides a comprehensive technical breakdown of the technologies u
 ART/
 ├── .github/
 │   └── workflows/
+│       ├── deploy-pages.yml     # Automated GitHub Pages deployment
 │       └── ci.yml               # Multi-platform CI (Ubuntu, macOS, Windows)
 ├── assets/                      # Sample visual output renders
 │   ├── monalisa_triangles.png
 │   ├── owl_beziers.png
 │   └── pyramids_cubics.png
+├── cmd/
+│   └── wasm/
+│       └── main.go              # WebAssembly Go engine bridge
 ├── examples/                    # Sample reference input images
 ├── primitive/                   # Core geometric synthesis engine
 │   ├── core.go                  # Color computation and line blitting
@@ -154,6 +165,9 @@ ART/
 │       ├── index.html           # Glassmorphic UI markup & SVG viewport
 │       ├── style.css            # CSS custom properties design system
 │       ├── app.js               # EventSource consumer & canvas motion logic
+│       ├── worker.js            # Background Web Worker for WebAssembly
+│       ├── wasm_exec.js         # Go WebAssembly runtime bridge
+│       ├── primitive.wasm       # Compiled Go WebAssembly engine
 │       └── sample.jpg           # Embedded classical reference portrait
 ├── Dockerfile                   # Production container definition for live cloud deploy
 ├── main.go                      # CLI flag parser and GUI launcher

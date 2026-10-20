@@ -17,7 +17,7 @@ It pairs a multi-core Go simulation engine with an interactive, glassmorphic dar
 > ### 🎨 Try ART Studio Online Now!
 > **Experience the live interactive web studio directly in your browser:**  
 > 👉 **[https://raghava00001.github.io/ART/](https://raghava00001.github.io/ART/)**  
-> *No install needed. Drag & drop any photo or use the sample portrait to watch vector art synthesize live.*
+> *Zero install required. Powered by the Go Primitive engine compiled to WebAssembly (Wasm) running at native speeds in a background Web Worker, with client-side hill-climbing optimization. Drag & drop any photo or click "Load Sample Reference" to watch vector art synthesize live!*
 
 ---
 
