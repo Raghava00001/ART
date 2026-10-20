@@ -80,6 +80,7 @@ func init() {
 	flag.IntVar(&Repeat, "rep", 0, "add N extra shapes per iteration with reduced search")
 	flag.BoolVar(&Pyramid, "pyramid", false, "enable coarse-to-fine multi-resolution pyramid")
 	flag.BoolVar(&GUI, "gui", false, "launch interactive web GUI studio")
+	flag.BoolVar(&GUI, "web", false, "launch interactive web GUI studio (alias for -gui)")
 	flag.IntVar(&Port, "port", 8080, "port for web GUI studio")
 	flag.BoolVar(&V, "v", false, "verbose")
 	flag.BoolVar(&VV, "vv", false, "very verbose")
