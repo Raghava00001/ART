@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: art-studio
+    runtime: docker
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 8080

@@ -102,7 +102,13 @@ func main() {
 
 	// If GUI mode requested, launch web server directly
 	if GUI {
-		if err := web.StartServer(Port); err != nil {
+		port := Port
+		if envPort := os.Getenv("PORT"); envPort != "" {
+			if p, err := strconv.Atoi(envPort); err == nil && p > 0 {
+				port = p
+			}
+		}
+		if err := web.StartServer(port); err != nil {
 			log.Fatal(err)
 		}
 		return

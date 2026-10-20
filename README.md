@@ -1,25 +1,61 @@
 # ART — Autonomous Geometric Vector Art Engine
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/art/primitive)](https://goreportcard.com)
+[![CI](https://github.com/Raghava00001/ART/actions/workflows/ci.yml/badge.svg)](https://github.com/Raghava00001/ART/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success.svg)](SECURITY.md)
+[![Tech Stack](https://img.shields.io/badge/Architecture-Tech%20Stack%20Deep%20Dive-8A2BE2.svg)](TECH_STACK.md)
 [![Go Version](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go)](go.mod)
-[![Architecture](https://img.shields.io/badge/Binary-Zero--Dependency%20Embedded-brightgreen.svg)](#installation--build)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
 
-**ART** is a high-performance vector synthesis engine that reproduces raster images using intelligent geometric and calligraphic primitives. Engineered with residual error heatmaps, multi-resolution annealing pyramids, and an interactive glassmorphic web atelier.
+**ART** is a high-performance vector synthesis engine that transforms raster images into beautiful geometric artwork and calligraphic strokes using hill-climbing stochastic optimization.
+
+It pairs a multi-core Go simulation engine with an interactive, glassmorphic dark-mode web atelier that streams vector artwork in real-time.
 
 ---
 
-## Key Features
+## Visual Gallery (Sample Outputs)
 
-- **Residual-Weighted Importance Sampling**: Shapes spawn preferentially in high-error regions (facial contours, fine edges, subtle textures) using CDF-sampled residual error heatmaps rather than wasting compute cycles on uniform backgrounds.
-- **Enhanced Bézier & Spline Engine**:
-  - **Mode 6 (Variable Béziers)**: Quadratic curves with dynamic stroke widths (0.5–16px) for expressive, calligraphic brushwork.
-  - **Mode 9 (Cubic Béziers)**: 4-control-point cubic curves enabling smooth S-curves, organic silhouettes, and fine strands.
-- **Coarse-to-Fine Multi-Resolution Pyramid**: Accelerates macro convergence at low resolution (64px) before progressively refining midrange (128px) and high-frequency details (256–512px).
-- **ART Studio (Interactive Web Atelier)**: A glassmorphic dark-mode web studio featuring real-time Server-Sent Events (SSE) streaming, interactive wipe comparison, manual priority brushing, and instant SVG/PNG/4K master exports.
-- **Zero-Dependency Single Binary**: Using Go's `embed.FS`, all web assets, stylesheets, scripts, and sample artwork are compiled directly into a single portable binary.
-- **Hardened Upload Security**: Comprehensive defense-in-depth security including decompression bomb mitigation, magic-byte MIME sniffing, strict 20MB request caps, parameter clamping, and zero disk persistence. Check out [SECURITY.md](SECURITY.md) for details.
+Here are examples of artwork synthesized directly by the ART engine from sample reference photos:
+
+| Reference Photo | Synthesized Artwork | Mode & Details |
+|:---:|:---:|:---|
+| <img src="examples/monalisa.png" width="200" alt="Mona Lisa reference"/> | <img src="assets/monalisa_triangles.png" width="200" alt="Mona Lisa Triangles"/> | **Mode 1: Geometric Triangles**<br>120 primitives with sharp planar facets capturing lighting and facial contours. |
+| <img src="examples/owl.png" width="200" alt="Owl reference"/> | <img src="assets/owl_beziers.png" width="200" alt="Owl Beziers"/> | **Mode 6: Variable Béziers**<br>120 calligraphic brush strokes with dynamic 0.5–16px width variation. |
+| <img src="examples/pyramids.png" width="200" alt="Pyramids reference"/> | <img src="assets/pyramids_cubics.png" width="200" alt="Pyramids Cubics"/> | **Mode 9: Cubic Bézier Splines**<br>120 4-point cubic curves capturing flowing silhouettes and natural horizons. |
+
+---
+
+## What We Built: Key Innovations & Enhancements
+
+Compared to traditional primitive art generators, ART v2.0 introduces the following breakthroughs:
+
+1. **Residual-Weighted Importance Sampling (CDF Error Maps)**:
+   - *Problem*: Traditional generators randomly pick positions uniformly across an entire image, wasting 70%+ of compute cycles testing shapes on flat backgrounds.
+   - *Our Solution*: We compute pixel-wise squared error $\Delta = |T - C|^2$ and build a 2D cumulative distribution function (CDF). Shapes spawn preferentially in high-error regions (facial contours, fine edges, and delicate textures).
+
+2. **Calligraphic Bézier & Cubic Spline Engine**:
+   - **Mode 6 (Variable Béziers)**: Quadratic curves with dynamic stroke widths (0.5–16px) for painterly brushwork.
+   - **Mode 9 (Cubic Béziers)**: 4-control-point cubic curves ($P_0, P_1, P_2, P_3$) that naturally accommodate inflection points (S-curves) essential for hair, drapery, and flowing silhouettes.
+
+3. **Coarse-to-Fine Multi-Resolution Annealing Pyramid**:
+   - Accelerates macro composition at 64px before progressively shifting to 128px and 384px. Base color planes are established rapidly before compute is spent on micro-details.
+
+4. **Zero-Dependency Single-Binary Architecture (`//go:embed`)**:
+   - The entire web GUI, CSS stylesheets, client scripts, and sample portraits are embedded directly into the Go executable via Go's `embed.FS`. The resulting binary can be moved to any folder or machine and works instantly with zero external dependencies.
+
+5. **Defense-in-Depth Upload Security**:
+   - Decompression bomb mitigation via `image.DecodeConfig` (stops 50,000×50,000 px pixel bomb DoS attacks).
+   - Magic-byte MIME sniffing (`http.DetectContentType`) rejecting malicious scripts and executable binaries.
+   - Strict 20MB request body caps (`http.MaxBytesReader`) and zero permanent disk residue (`r.MultipartForm.RemoveAll()`).
+   - Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and strict `Content-Security-Policy`. (See [SECURITY.md](SECURITY.md)).
+
+6. **Interactive Glassmorphic Web Atelier (SSE Real-Time Streaming)**:
+   - Live 60fps Server-Sent Events (SSE) streaming updates vector paths into the browser DOM in real time.
+   - Interactive A/B split wipe divider, focal priority brush, live color palette extraction, and instant SVG/PNG/4K master exports.
+
+7. **100% Passing Multi-OS Test Suite & GitHub CI**:
+   - Unit tests covering scanline rasterizers, model convergence, multi-resolution retargeting, web endpoints, and upload security.
+   - Automated GitHub Actions CI workflow running across **Ubuntu, macOS, and Windows**.
 
 ---
 
@@ -55,19 +91,47 @@
        └─────────────────────────────────────────────┘
 ```
 
+For an in-depth breakdown of technology decisions, see [TECH_STACK.md](TECH_STACK.md).
+
 ---
 
-## Installation & Build
+## Live Cloud Deployment & Docker
 
-Build the single self-contained `art` binary:
+You can run ART as a container or deploy it live to the cloud with zero setup:
+
+### Deploy to Render (Free)
+1. Fork or push this repository to your GitHub account: `https://github.com/Raghava00001/ART`.
+2. Go to [Render.com](https://render.com) and click **New > Web Service**.
+3. Select your repository `Raghava00001/ART`.
+4. Render will automatically detect [`Dockerfile`](Dockerfile) and [`render.yaml`](render.yaml) and deploy your web studio live!
+
+### Run Locally with Docker
+
+```bash
+# Build Docker image
+docker build -t art-studio .
+
+# Run container on port 8080
+docker run -p 8080:8080 art-studio
+```
+
+Then visit `http://localhost:8080` in your web browser.
+
+---
+
+## Local Installation & Build
+
+Build the single self-contained native executable using standard Go:
 
 ```bash
 go build -v -o art.exe .
 ```
 
-*Note: On macOS and Linux, output binary is `./art`.*
+*Note: On Linux and macOS, the binary is compiled with `go build -v -o art .`.*
 
-To run the complete test suite:
+### Run Tests
+
+Run the complete multi-package test suite:
 
 ```bash
 go test -v ./...
@@ -79,14 +143,14 @@ go test -v ./...
 
 ### 1. Interactive Web Studio
 
-Launch the browser-based studio on any port (default `8080`):
+Launch the built-in browser studio:
 
 ```bash
 art -gui -port 8080
 ```
 
-Open `http://localhost:8080` in your browser:
-- **Drag & Drop** any reference image or click the sample portrait to load instantly.
+Open `http://localhost:8080` in any web browser:
+- **Drag & Drop** any photo or click the sample portrait to load instantly.
 - **Select Primitives**: Choose from 10 geometric and calligraphic modes.
 - **Priority Brush**: Paint over focal areas (eyes, mouth, signature lines) to concentrate detail.
 - **A/B Split Wipe**: Slide the interactive divider to inspect raster vs. vector accuracy.
@@ -110,7 +174,7 @@ Open `http://localhost:8080` in your browser:
 
 ---
 
-### 2. Command Line Interface
+### 2. Command Line Interface (CLI)
 
 ```bash
 art -i input.jpg -o output.png -n 150 -m 1 -r 256 -pyramid
@@ -183,7 +247,7 @@ Contributions, bug reports, and suggestions are welcome!
 
 ---
 
-## License
+## License & Attribution
 
 This project is licensed under the [MIT License](LICENSE.md).  
-Original core concept inspired by [Michael Fogleman](https://github.com/fogleman/primitive).
+Core concept and scanline rasterizer inspired by [Michael Fogleman](https://github.com/fogleman/primitive).
