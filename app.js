@@ -1,0 +1,1512 @@
+// ART Studio — Autonomous Geometric Vector Art Engine
+// Antigravity Design Language & Motion Controller
+
+document.addEventListener('DOMContentLoaded', () => {
+  // ========================================================================
+  // Ambient Interactive Particle Simulation (Antigravity Liftoff Atmosphere)
+  // ========================================================================
+  initAmbientParticles();
+
+  // DOM References
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const dropContent = document.getElementById('drop-content');
+  const sourcePreview = document.getElementById('source-preview');
+  const btnLoadSample = document.getElementById('btn-load-sample');
+  const sourceResBadge = document.getElementById('source-res-badge');
+  const referenceCard = document.getElementById('reference-card');
+  const referenceDims = document.getElementById('reference-dims');
+  const referenceAspect = document.getElementById('reference-aspect');
+  const paletteSwatches = document.getElementById('palette-swatches');
+  const btnChangeImage = document.getElementById('btn-change-image');
+
+  const presetPills = document.querySelectorAll('.preset-pill');
+  const modeChips = document.querySelectorAll('.mode-chip');
+  const sliders = document.querySelectorAll('.studio-slider');
+  const inputCount = document.getElementById('input-count');
+  const valCount = document.getElementById('val-count');
+  const inputAlpha = document.getElementById('input-alpha');
+  const valAlpha = document.getElementById('val-alpha');
+  const inputRepeat = document.getElementById('input-repeat');
+  const valRepeat = document.getElementById('val-repeat');
+  const inputRes = document.getElementById('input-res');
+  const valRes = document.getElementById('val-res');
+  const togglePyramid = document.getElementById('toggle-pyramid');
+
+  const headerModeDisplay = document.getElementById('header-mode-display');
+  const headerResDisplay = document.getElementById('header-res-display');
+  const headerPyramidDisplay = document.getElementById('header-pyramid-display');
+  const engineStatusPill = document.getElementById('engine-status-pill');
+  const engineStatusText = document.getElementById('engine-status-text');
+
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  const btnRefine = document.getElementById('btn-refine');
+  const btnRefineText = document.getElementById('btn-refine-text');
+  const btnCopySvg = document.getElementById('btn-copy-svg');
+  const copyBtnText = document.getElementById('copy-btn-text');
+  const btnExportPng = document.getElementById('btn-export-png');
+  const btnExportSvg = document.getElementById('btn-export-svg');
+  const btnExportAnim = document.getElementById('btn-export-anim');
+  const btnExport4k = document.getElementById('btn-export-4k');
+  const exportModal = document.getElementById('export-modal');
+  const btnCloseExportModal = document.getElementById('btn-close-export-modal');
+  const exportResCards = document.querySelectorAll('#export-res-options .export-option-card');
+  const exportTexturePills = document.querySelectorAll('#export-texture-options .export-pill');
+  const exportGalleryMat = document.getElementById('export-gallery-mat');
+  const exportSpecDims = document.getElementById('export-spec-dims');
+  const exportSpecPhysical = document.getElementById('export-spec-physical');
+  const btnDoExportMaster = document.getElementById('btn-do-export-master');
+  const exportSubmitText = document.getElementById('export-submit-text');
+
+  const btnToggleBrush = document.getElementById('btn-toggle-brush');
+  const btnToggleWireframe = document.getElementById('btn-toggle-wireframe');
+  const btnToggleTexture = document.getElementById('btn-toggle-texture');
+  const brushToolbar = document.getElementById('brush-toolbar');
+  const brushSize = document.getElementById('brush-size');
+  const brushSizeVal = document.getElementById('brush-size-val');
+  const btnClearMask = document.getElementById('btn-clear-mask');
+  const maskCanvas = document.getElementById('mask-canvas');
+  const heatmapCanvas = document.getElementById('heatmap-canvas');
+  const timelineScrubberWrap = document.getElementById('timeline-scrubber-wrap');
+  const btnTimelinePlay = document.getElementById('btn-timeline-play');
+  const timelineSlider = document.getElementById('timeline-slider');
+  const timelineStepText = document.getElementById('timeline-step-text');
+
+  const canvasStage = document.getElementById('canvas-stage');
+  const canvasWrapper = document.getElementById('canvas-wrapper');
+  const vectorCanvas = document.getElementById('vector-canvas');
+  const wipeOverlay = document.getElementById('wipe-overlay');
+  const splitImg = document.getElementById('split-img');
+  const wipeHandle = document.getElementById('wipe-handle');
+  const emptyState = document.getElementById('empty-state');
+  const tagRef = document.getElementById('tag-ref');
+  const tagVec = document.getElementById('tag-vec');
+  const viewModeButtons = document.querySelectorAll('.segment-btn');
+
+  const btnZoomIn = document.getElementById('btn-zoom-in');
+  const btnZoomOut = document.getElementById('btn-zoom-out');
+  const btnZoomFit = document.getElementById('btn-zoom-fit');
+  const zoomLevelText = document.getElementById('zoom-level-text');
+  const btnToggleGrid = document.getElementById('btn-toggle-grid');
+
+  const progressBarFill = document.getElementById('progress-bar-fill');
+  const metricShapes = document.getElementById('metric-shapes');
+  const metricFidelity = document.getElementById('metric-fidelity');
+  const metricScore = document.getElementById('metric-score');
+  const metricSpeed = document.getElementById('metric-speed');
+  const metricTime = document.getElementById('metric-time');
+  const statusHint = document.getElementById('status-hint');
+
+  const shortcutsModal = document.getElementById('shortcuts-modal');
+  const btnShortcutsModal = document.getElementById('btn-shortcuts-modal');
+  const btnCloseModal = document.getElementById('btn-close-modal');
+  const toastShelf = document.getElementById('toast-shelf');
+
+  // Application State
+  let currentMode = 1;
+  let currentImageData = null;
+  let eventSource = null;
+  let isRunning = false;
+  let shapeCountTarget = 220;
+  let currentDimensions = { width: 1024, height: 1024, bg: '#090a0d' };
+  let wipeRatio = 0.5;
+  let isDraggingWipe = false;
+  let activeViewMode = 'split';
+  let currentZoom = 1.0;
+  let latestFullSvg = null;
+  let currentTextureMode = 'none'; // 'none' | 'paper' | 'canvas'
+  let isContinuing = false;
+  let heatmapPending = false;
+
+  // Mask & Detail Priority State
+  let isBrushActive = false;
+  let isDrawingMask = false;
+  let hasUserMask = false;
+  let currentBrushRadius = 35;
+  let lastBrushX = 0;
+  let lastBrushY = 0;
+  let maskCtx = maskCanvas ? maskCanvas.getContext('2d') : null;
+
+  // Timeline History & Replay State
+  let shapeHistory = [];
+  let isTimelinePlaying = false;
+  let timelineInterval = null;
+  let baseBgRect = '';
+
+  const modeNames = {
+    1: 'Triangles',
+    6: 'Béziers',
+    9: 'Cubic Béziers',
+    2: 'Rectangles',
+    3: 'Ellipses',
+    4: 'Circles',
+    5: 'Rotated Rect',
+    7: 'Rotated Ellipse',
+    8: 'Polygons',
+    0: 'Combo All'
+  };
+
+  // ========================================================================
+  // Ambient Particle Simulation
+  // ========================================================================
+
+  function initAmbientParticles() {
+    const canvas = document.getElementById('ambient-particles');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    const colors = [
+      'rgba(66, 133, 244, ',   // Blue
+      'rgba(234, 67, 53, ',    // Coral
+      'rgba(251, 188, 4, ',    // Warm Amber
+      'rgba(52, 168, 83, ',    // Emerald
+      'rgba(161, 66, 244, '    // Violet
+    ];
+
+    const count = 55;
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: Math.random() * 1.8 + 0.8,
+        speedY: -(Math.random() * 0.35 + 0.12),
+        speedX: (Math.random() - 0.5) * 0.2,
+        colorPrefix: colors[Math.floor(Math.random() * colors.length)],
+        baseAlpha: Math.random() * 0.25 + 0.15,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+
+    let mouseX = -1000;
+    let mouseY = -1000;
+    window.addEventListener('pointermove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < count; i++) {
+        const p = particles[i];
+        p.phase += 0.015;
+        p.y += p.speedY;
+        p.x += p.speedX + Math.sin(p.phase) * 0.18;
+
+        // Subtle breeze repulsion
+        const dx = p.x - mouseX;
+        const dy = p.y - mouseY;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 130 && dist > 0) {
+          const force = (130 - dist) / 130;
+          p.x += (dx / dist) * force * 1.2;
+          p.y += (dy / dist) * force * 1.2;
+        }
+
+        if (p.y < -10) {
+          p.y = height + 10;
+          p.x = Math.random() * width;
+        }
+        if (p.x < -10) p.x = width + 10;
+        if (p.x > width + 10) p.x = -10;
+
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        if (isDark) {
+          ctx.shadowBlur = p.r * 2.5;
+          ctx.shadowColor = `${p.colorPrefix}0.6)`;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+        ctx.fillStyle = `${p.colorPrefix}${isDark ? Math.min(0.85, p.baseAlpha * 1.8) : p.baseAlpha})`;
+        ctx.fill();
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // ========================================================================
+  // Toast Notification System
+  // ========================================================================
+
+  function showToast(message, icon = '✓') {
+    const toast = document.createElement('div');
+    toast.className = 'toast-item';
+    toast.innerHTML = `
+      <span class="toast-icon">${icon}</span>
+      <span class="toast-message">${message}</span>
+    `;
+    toastShelf.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(6px) scale(0.96)';
+      setTimeout(() => toast.remove(), 200);
+    }, 2800);
+  }
+
+  // ========================================================================
+  // Dynamic Range Sliders (Apple Track Fill)
+  // ========================================================================
+
+  function updateSliderFill(slider) {
+    const min = parseFloat(slider.min) || 0;
+    const max = parseFloat(slider.max) || 100;
+    const val = parseFloat(slider.value) || 0;
+    const pct = ((val - min) / (max - min)) * 100;
+    slider.style.setProperty('--fill', `${pct}%`);
+  }
+
+  sliders.forEach(slider => {
+    updateSliderFill(slider);
+    slider.addEventListener('input', () => updateSliderFill(slider));
+  });
+
+  // ========================================================================
+  // Canvas Geometry & Aspect Ratio
+  // ========================================================================
+
+  function applyCanvasDimensions(w, h, bg) {
+    if (!w || !h) return;
+    currentDimensions.width = w;
+    currentDimensions.height = h;
+    if (bg) currentDimensions.bg = bg;
+
+    const aspect = w / h;
+    const stageH = canvasStage.clientHeight || 600;
+    const stageW = canvasStage.clientWidth || 800;
+
+    const maxCanvasH = Math.min(stageH - 70, 640);
+    const maxCanvasW = Math.min(stageW - 60, 900);
+
+    let canvasW, canvasH;
+    if (maxCanvasW / maxCanvasH > aspect) {
+      canvasH = maxCanvasH;
+      canvasW = canvasH * aspect;
+    } else {
+      canvasW = maxCanvasW;
+      canvasH = canvasW / aspect;
+    }
+
+    canvasWrapper.style.width = `${Math.round(canvasW)}px`;
+    canvasWrapper.style.height = `${Math.round(canvasH)}px`;
+
+    vectorCanvas.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    vectorCanvas.setAttribute('width', '100%');
+    vectorCanvas.setAttribute('height', '100%');
+
+    splitImg.style.width = `${Math.round(canvasW)}px`;
+    splitImg.style.height = `${Math.round(canvasH)}px`;
+
+    if (maskCanvas) {
+      if (maskCanvas.width !== w || maskCanvas.height !== h) {
+        maskCanvas.width = w;
+        maskCanvas.height = h;
+      }
+      maskCanvas.style.width = `${Math.round(canvasW)}px`;
+      maskCanvas.style.height = `${Math.round(canvasH)}px`;
+    }
+
+    if (bg) {
+      vectorCanvas.innerHTML = `<rect width="${w}" height="${h}" fill="${bg}"/>`;
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    if (currentDimensions.width && currentDimensions.height) {
+      applyCanvasDimensions(currentDimensions.width, currentDimensions.height);
+    }
+  });
+
+  // ========================================================================
+  // Canvas Zoom & Checkerboard Grid
+  // ========================================================================
+
+  function setZoom(val) {
+    currentZoom = Math.max(0.5, Math.min(2.0, val));
+    canvasWrapper.style.setProperty('--canvas-zoom', currentZoom);
+    zoomLevelText.textContent = `${Math.round(currentZoom * 100)}%`;
+  }
+
+  btnZoomIn.addEventListener('click', () => setZoom(currentZoom + 0.1));
+  btnZoomOut.addEventListener('click', () => setZoom(currentZoom - 0.1));
+  btnZoomFit.addEventListener('click', () => setZoom(1.0));
+
+  btnToggleGrid.addEventListener('click', () => {
+    canvasWrapper.classList.toggle('checkerboard');
+    btnToggleGrid.classList.toggle('active');
+  });
+
+  // ========================================================================
+  // Dominant Color Palette Extraction
+  // ========================================================================
+
+  function extractDominantColors(imgSrc) {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = 16;
+        sampleCanvas.height = 16;
+        const ctx = sampleCanvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const imgData = ctx.getImageData(0, 0, 16, 16).data;
+
+        const colorCounts = {};
+        for (let i = 0; i < imgData.length; i += 16) {
+          const r = Math.round(imgData[i] / 32) * 32;
+          const g = Math.round(imgData[i + 1] / 32) * 32;
+          const b = Math.round(imgData[i + 2] / 32) * 32;
+          const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+          colorCounts[hex] = (colorCounts[hex] || 0) + 1;
+        }
+
+        const sortedColors = Object.keys(colorCounts)
+          .sort((a, b) => colorCounts[b] - colorCounts[a])
+          .slice(0, 5);
+
+        paletteSwatches.innerHTML = '';
+        sortedColors.forEach(hex => {
+          const chip = document.createElement('div');
+          chip.className = 'palette-chip';
+          chip.style.backgroundColor = hex;
+          chip.title = `Copy ${hex.toUpperCase()}`;
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(hex.toUpperCase());
+            showToast(`Copied ${hex.toUpperCase()}`);
+          });
+          paletteSwatches.appendChild(chip);
+        });
+      } catch (err) {
+        console.warn('Palette extraction skipped:', err);
+      }
+    };
+    img.src = imgSrc;
+  }
+
+  // ========================================================================
+  // Interactive Before / After Split-Wipe Slider
+  // ========================================================================
+
+  function setWipePosition(ratio, updateActiveMode = true) {
+    const clamped = Math.max(0, Math.min(1, ratio));
+    wipeRatio = clamped;
+    const pct = (clamped * 100).toFixed(2);
+    canvasWrapper.style.setProperty('--wipe-pos', `${pct}%`);
+
+    if (updateActiveMode) {
+      if (clamped <= 0.02) {
+        setActiveViewSegment('vector');
+      } else if (clamped >= 0.98) {
+        setActiveViewSegment('reference');
+      } else {
+        setActiveViewSegment('split');
+      }
+    }
+  }
+
+  function handlePointerMove(e) {
+    if (!isDraggingWipe) return;
+    const rect = canvasWrapper.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const pos = (clientX - rect.left) / rect.width;
+    setWipePosition(pos);
+  }
+
+  function stopDragging() {
+    isDraggingWipe = false;
+    document.removeEventListener('pointermove', handlePointerMove);
+    document.removeEventListener('pointerup', stopDragging);
+    document.removeEventListener('pointercancel', stopDragging);
+  }
+
+  wipeHandle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    isDraggingWipe = true;
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', stopDragging);
+    document.addEventListener('pointercancel', stopDragging);
+  });
+
+  canvasWrapper.addEventListener('click', (e) => {
+    if (e.target.closest('#wipe-handle') || !currentImageData) return;
+    const rect = canvasWrapper.getBoundingClientRect();
+    const pos = (e.clientX - rect.left) / rect.width;
+    setWipePosition(pos);
+  });
+
+  function setActiveViewSegment(mode) {
+    activeViewMode = mode;
+    viewModeButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-view') === mode);
+    });
+
+    if (heatmapCanvas) {
+      heatmapCanvas.classList.toggle('hidden', mode !== 'heatmap');
+    }
+
+    if (mode === 'split') {
+      wipeHandle.classList.remove('hidden');
+      tagRef.classList.remove('hidden');
+      tagVec.classList.remove('hidden');
+      tagVec.textContent = 'Synthesized Vector';
+      setWipePosition(0.5, false);
+    } else if (mode === 'vector') {
+      wipeHandle.classList.add('hidden');
+      tagRef.classList.add('hidden');
+      tagVec.classList.remove('hidden');
+      tagVec.textContent = 'Synthesized Vector';
+      setWipePosition(0, false);
+    } else if (mode === 'reference') {
+      wipeHandle.classList.add('hidden');
+      tagRef.classList.remove('hidden');
+      tagVec.classList.add('hidden');
+      setWipePosition(1, false);
+    } else if (mode === 'heatmap') {
+      wipeHandle.classList.add('hidden');
+      tagRef.classList.add('hidden');
+      tagVec.classList.remove('hidden');
+      tagVec.textContent = 'Delta Heatmap (|Ref − Vector|)';
+      setWipePosition(0, false);
+      updateErrorHeatmap();
+    }
+  }
+
+  // ========================================================================
+  // Error Delta Heatmap Engine (Magma Spectrum Differential Analyzer)
+  // ========================================================================
+
+  async function updateErrorHeatmap() {
+    if (!heatmapCanvas || !splitImg || !splitImg.src || shapeHistory.length === 0) return;
+    if (heatmapPending) return;
+    heatmapPending = true;
+
+    try {
+      const renderW = 256;
+      const aspect = (currentDimensions.height || 1024) / (currentDimensions.width || 1024);
+      const renderH = Math.max(64, Math.round(renderW * aspect));
+
+      heatmapCanvas.width = renderW;
+      heatmapCanvas.height = renderH;
+      const heatCtx = heatmapCanvas.getContext('2d');
+      if (!heatCtx) return;
+
+      // 1. Offscreen Reference Image
+      const offRef = document.createElement('canvas');
+      offRef.width = renderW;
+      offRef.height = renderH;
+      const refCtx = offRef.getContext('2d');
+      refCtx.drawImage(splitImg, 0, 0, renderW, renderH);
+      const refData = refCtx.getImageData(0, 0, renderW, renderH).data;
+
+      // 2. Offscreen Vector SVG Image
+      const svgCode = latestFullSvg || vectorCanvas.outerHTML;
+      const svgBlob = new Blob([svgCode], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const svgImg = new Image();
+
+      await new Promise((resolve) => {
+        svgImg.onload = () => resolve();
+        svgImg.onerror = () => resolve();
+        svgImg.src = svgUrl;
+      });
+
+      const offVec = document.createElement('canvas');
+      offVec.width = renderW;
+      offVec.height = renderH;
+      const vecCtx = offVec.getContext('2d');
+      vecCtx.fillStyle = currentDimensions.bg || '#090a0d';
+      vecCtx.fillRect(0, 0, renderW, renderH);
+      vecCtx.drawImage(svgImg, 0, 0, renderW, renderH);
+      URL.revokeObjectURL(svgUrl);
+      const vecData = vecCtx.getImageData(0, 0, renderW, renderH).data;
+
+      // 3. Compute Delta and Map to Glowing Magma Palette
+      const heatImgData = heatCtx.createImageData(renderW, renderH);
+      const out = heatImgData.data;
+      const totalPixels = renderW * renderH;
+
+      for (let i = 0; i < totalPixels; i++) {
+        const idx = i * 4;
+        const dr = Math.abs(refData[idx] - vecData[idx]);
+        const dg = Math.abs(refData[idx + 1] - vecData[idx + 1]);
+        const db = Math.abs(refData[idx + 2] - vecData[idx + 2]);
+        
+        // Perceptual color delta normalized 0..1, amplified for micro-features
+        const delta = Math.min(1.0, ((0.299 * dr + 0.587 * dg + 0.114 * db) / 255) * 2.8);
+
+        // Magma gradient interpolation
+        let r, g, b;
+        if (delta < 0.2) {
+          const t = delta / 0.2;
+          r = Math.round(5 + t * 45);
+          g = Math.round(5 + t * 15);
+          b = Math.round(10 + t * 75);
+        } else if (delta < 0.5) {
+          const t = (delta - 0.2) / 0.3;
+          r = Math.round(50 + t * 115);
+          g = Math.round(20 + t * 15);
+          b = Math.round(85 + t * 40);
+        } else if (delta < 0.8) {
+          const t = (delta - 0.5) / 0.3;
+          r = Math.round(165 + t * 75);
+          g = Math.round(35 + t * 75);
+          b = Math.round(125 - t * 45);
+        } else {
+          const t = (delta - 0.8) / 0.2;
+          r = Math.round(240 + t * 15);
+          g = Math.round(110 + t * 140);
+          b = Math.round(80 + t * 100);
+        }
+
+        out[idx] = r;
+        out[idx + 1] = g;
+        out[idx + 2] = b;
+        out[idx + 3] = 255;
+      }
+
+      heatCtx.putImageData(heatImgData, 0, 0);
+    } catch (e) {
+      console.warn('Heatmap generation failed:', e);
+    } finally {
+      heatmapPending = false;
+    }
+  }
+
+  function updateRefineButtonLabel() {
+    if (!btnRefineText) return;
+    if (hasUserMask) {
+      btnRefineText.textContent = '+50 Detail Shapes (Focus Region)';
+    } else {
+      btnRefineText.textContent = '+50 Detail Shapes';
+    }
+  }
+
+  viewModeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setActiveViewSegment(btn.getAttribute('data-view'));
+    });
+  });
+
+  setWipePosition(0.5);
+
+  // ========================================================================
+  // Curated Presets (Tuned for Crisp Drapery & High Detail)
+  // ========================================================================
+
+  const presetsConfig = {
+    mosaic: { mode: 1, count: 220, alpha: 128, repeat: 1, res: 384, pyramid: true, name: 'Geometric Mosaic' },
+    curves: { mode: 6, count: 180, alpha: 128, repeat: 1, res: 384, pyramid: true, name: 'Fluid Béziers' },
+    cubic: { mode: 9, count: 200, alpha: 120, repeat: 1, res: 384, pyramid: true, name: 'Cubic Ribbons' },
+    minimal: { mode: 2, count: 90, alpha: 180, repeat: 0, res: 256, pyramid: false, name: 'Minimalist' },
+    fidelity: { mode: 0, count: 350, alpha: 100, repeat: 2, res: 512, pyramid: true, name: 'High Fidelity' }
+  };
+
+  presetPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      presetPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const presetKey = pill.getAttribute('data-preset');
+      const cfg = presetsConfig[presetKey];
+      if (!cfg) return;
+
+      selectMode(cfg.mode);
+      inputCount.value = cfg.count;
+      valCount.textContent = cfg.count;
+      shapeCountTarget = cfg.count;
+      metricShapes.textContent = `0 / ${cfg.count}`;
+      updateSliderFill(inputCount);
+
+      inputAlpha.value = cfg.alpha;
+      valAlpha.textContent = cfg.alpha;
+      updateSliderFill(inputAlpha);
+
+      inputRepeat.value = cfg.repeat;
+      valRepeat.textContent = cfg.repeat;
+      updateSliderFill(inputRepeat);
+
+      inputRes.value = cfg.res;
+      valRes.textContent = `${cfg.res}px`;
+      headerResDisplay.textContent = `${cfg.res}px Grid`;
+      updateSliderFill(inputRes);
+
+      togglePyramid.checked = cfg.pyramid;
+      headerPyramidDisplay.textContent = cfg.pyramid ? 'Pyramid On' : 'Pyramid Off';
+
+      showToast(`Applied preset: ${cfg.name}`);
+    });
+  });
+
+  // ========================================================================
+  // Mode Selection
+  // ========================================================================
+
+  function selectMode(modeInt) {
+    currentMode = modeInt;
+    modeChips.forEach(chip => {
+      const isTarget = parseInt(chip.getAttribute('data-mode')) === modeInt;
+      chip.classList.toggle('active', isTarget);
+      chip.setAttribute('aria-checked', isTarget ? 'true' : 'false');
+    });
+    headerModeDisplay.textContent = `Mode: ${modeNames[currentMode] || 'Mode ' + currentMode}`;
+  }
+
+  modeChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      selectMode(parseInt(chip.getAttribute('data-mode')));
+    });
+  });
+
+  // ========================================================================
+  // Sliders Binding
+  // ========================================================================
+
+  inputCount.addEventListener('input', (e) => {
+    shapeCountTarget = parseInt(e.target.value);
+    valCount.textContent = shapeCountTarget;
+    metricShapes.textContent = `0 / ${shapeCountTarget}`;
+  });
+
+  inputAlpha.addEventListener('input', (e) => {
+    valAlpha.textContent = e.target.value;
+  });
+
+  inputRepeat.addEventListener('input', (e) => {
+    valRepeat.textContent = e.target.value;
+  });
+
+  inputRes.addEventListener('input', (e) => {
+    valRes.textContent = `${e.target.value}px`;
+    headerResDisplay.textContent = `${e.target.value}px Grid`;
+  });
+
+  togglePyramid.addEventListener('change', (e) => {
+    headerPyramidDisplay.textContent = e.target.checked ? 'Pyramid On' : 'Pyramid Off';
+  });
+
+  // ========================================================================
+  // Image Loading & Reference Card Presentation
+  // ========================================================================
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  btnChangeImage.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  });
+
+  function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      currentImageData = e.target.result;
+      sourcePreview.src = currentImageData;
+      splitImg.src = currentImageData;
+
+      dropZone.classList.add('hidden');
+      referenceCard.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      statusHint.textContent = `Reference loaded: ${file.name}`;
+
+      const img = new Image();
+      img.onload = () => {
+        const aspectVal = (img.naturalWidth / img.naturalHeight).toFixed(2);
+        sourceResBadge.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+        referenceDims.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+        referenceAspect.textContent = `Aspect ratio 1:${(1 / aspectVal).toFixed(2)}`;
+        applyCanvasDimensions(img.naturalWidth, img.naturalHeight);
+        extractDominantColors(currentImageData);
+        if (maskCtx && maskCanvas) {
+          maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+          hasUserMask = false;
+        }
+      };
+      img.src = currentImageData;
+      showToast(`Loaded ${file.name}`);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Load Sample Portrait
+  btnLoadSample.addEventListener('click', async () => {
+    try {
+      statusHint.textContent = 'Loading reference sample...';
+      const res = await fetch('/api/sample');
+      if (!res.ok) throw new Error('Sample not found');
+      const data = await res.json();
+      currentImageData = data.b64;
+      sourcePreview.src = currentImageData;
+      splitImg.src = currentImageData;
+
+      dropZone.classList.add('hidden');
+      referenceCard.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      const aspectVal = (data.width / data.height).toFixed(2);
+      sourceResBadge.textContent = `${data.width}×${data.height}`;
+      referenceDims.textContent = `${data.width} × ${data.height} px`;
+      referenceAspect.textContent = `Aspect ratio 1:${(1 / aspectVal).toFixed(2)}`;
+      statusHint.textContent = `Sample loaded (${data.width}×${data.height}px)`;
+
+      applyCanvasDimensions(data.width, data.height);
+      extractDominantColors(currentImageData);
+      if (maskCtx && maskCanvas) {
+        maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+        hasUserMask = false;
+      }
+      showToast(`Sample reference loaded (${data.width}×${data.height}px)`);
+    } catch (err) {
+      statusHint.textContent = 'Sample failed to load. Please drop an image.';
+    }
+  });
+
+  // ========================================================================
+  // Engine Synthesis Lifecycle & Iterative Refinement
+  // ========================================================================
+
+  async function startSynthesis(isContinue = false) {
+    if (!currentImageData) {
+      showToast('Please upload or load an image first', '⚠️');
+      return;
+    }
+
+    if (isRunning) return;
+
+    isContinuing = isContinue;
+    stopTimelinePlay();
+
+    if (!isContinue) {
+      shapeHistory = [];
+      if (timelineScrubberWrap) {
+        timelineScrubberWrap.classList.add('hidden');
+      }
+      baseBgRect = currentDimensions.bg ? `<rect width="${currentDimensions.width}" height="${currentDimensions.height}" fill="${currentDimensions.bg}"/>` : '';
+      if (baseBgRect) {
+        vectorCanvas.innerHTML = baseBgRect;
+      }
+    }
+
+    setupEventSource();
+
+    const shapeBudget = isContinue ? 50 : parseInt(inputCount.value);
+    const payload = {
+      count: shapeBudget,
+      mode: currentMode,
+      alpha: parseInt(inputAlpha.value),
+      repeat: parseInt(inputRepeat.value),
+      resolution: isContinue ? Math.max(parseInt(inputRes.value), 384) : parseInt(inputRes.value),
+      outputSize: 1024,
+      pyramid: isContinue ? false : togglePyramid.checked,
+      continue: isContinue,
+      imageData: currentImageData,
+      maskData: hasUserMask && maskCanvas ? maskCanvas.toDataURL('image/png') : ''
+    };
+
+    setRunningState(true);
+    if (isContinue) {
+      statusHint.textContent = hasUserMask ? 'Refining focus regions (+50 micro-shapes)...' : 'Refining high-frequency details (+50 shapes)...';
+      showToast(hasUserMask ? 'Packing 50 focus-priority micro-shapes...' : 'Adding 50 refinement shapes...');
+    } else {
+      statusHint.textContent = hasUserMask ? 'Synthesizing with Focus Priority Mask...' : 'Synthesizing vector primitives...';
+      emptyState.classList.add('hidden');
+    }
+
+    try {
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Engine rejected start');
+    } catch (err) {
+      setRunningState(false);
+      statusHint.textContent = 'Error starting synthesis engine';
+      showToast('Failed to start synthesis', '✕');
+    }
+  }
+
+  btnStart.addEventListener('click', () => startSynthesis(false));
+
+  if (btnRefine) {
+    btnRefine.addEventListener('click', () => startSynthesis(true));
+  }
+
+  btnStop.addEventListener('click', async () => {
+    statusHint.textContent = 'Halting engine...';
+    await fetch('/api/stop', { method: 'POST' });
+    setRunningState(false);
+    showToast('Synthesis stopped');
+  });
+
+  function setRunningState(running) {
+    isRunning = running;
+    if (running) {
+      btnStart.classList.add('hidden');
+      if (btnRefine) btnRefine.classList.add('hidden');
+      btnStop.classList.remove('hidden');
+      engineStatusText.textContent = isContinuing ? 'Refining' : 'Synthesizing';
+      engineStatusPill.classList.add('running');
+    } else {
+      btnStart.classList.remove('hidden');
+      if (btnRefine && shapeHistory.length > 0) {
+        btnRefine.classList.remove('hidden');
+        updateRefineButtonLabel();
+      }
+      btnStop.classList.add('hidden');
+      engineStatusText.textContent = 'Engine Ready';
+      engineStatusPill.classList.remove('running');
+    }
+  }
+
+  function setupEventSource() {
+    if (eventSource) {
+      eventSource.close();
+    }
+
+    eventSource = new EventSource('/api/events');
+
+    eventSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'init') {
+          handleInit(data);
+        } else if (data.type === 'shape') {
+          handleShapeUpdate(data);
+        } else if (data.type === 'done') {
+          handleDone(data);
+        } else if (data.type === 'cancelled') {
+          setRunningState(false);
+          statusHint.textContent = 'Synthesis paused.';
+        }
+      } catch (err) {
+        console.error('SSE parsing error:', err);
+      }
+    };
+  }
+
+  function handleInit(data) {
+    if (!data.continued) {
+      applyCanvasDimensions(data.width, data.height, data.bg);
+    }
+  }
+
+  function handleShapeUpdate(data) {
+    if (data.svgChunk) {
+      shapeHistory.push(data.svgChunk);
+      vectorCanvas.insertAdjacentHTML('beforeend', data.svgChunk);
+    }
+
+    const pct = Math.min(100, (data.frame / data.total) * 100);
+    progressBarFill.style.width = `${pct}%`;
+    metricShapes.textContent = `${data.frame} / ${data.total}`;
+    
+    // Natural visual match percentage
+    const matchPct = Math.max(0, Math.min(100, (1 - data.score * 1.8) * 100)).toFixed(1);
+    if (metricFidelity) {
+      metricFidelity.textContent = `${matchPct}% Match`;
+    }
+    metricScore.textContent = `RMSE ${data.score.toFixed(4)}`;
+    metricTime.textContent = `${data.elapsed.toFixed(1)}s`;
+
+    if (data.nps > 1000000) {
+      metricSpeed.textContent = `${(data.nps / 1000000).toFixed(1)}M /s`;
+    } else if (data.nps > 1000) {
+      metricSpeed.textContent = `${(data.nps / 1000).toFixed(0)}k /s`;
+    } else {
+      metricSpeed.textContent = `${Math.round(data.nps)} /s`;
+    }
+
+    statusHint.textContent = `Stage ${(data.stage || 0) + 1} (${data.resolution}px grid) — Primitive ${data.frame}`;
+
+    if (activeViewMode === 'heatmap' && data.frame % 20 === 0) {
+      updateErrorHeatmap();
+    }
+  }
+
+  function handleDone(data) {
+    setRunningState(false);
+    progressBarFill.style.width = '100%';
+    const matchPct = Math.max(0, Math.min(100, (1 - data.score * 1.8) * 100)).toFixed(1);
+    if (metricFidelity) {
+      metricFidelity.textContent = `${matchPct}% Match`;
+    }
+    metricScore.textContent = `RMSE ${data.score.toFixed(4)}`;
+    metricTime.textContent = `${data.duration.toFixed(2)}s`;
+    statusHint.textContent = `Completed in ${data.duration.toFixed(2)}s — ${matchPct}% fidelity`;
+
+    if (data.fullSVG) {
+      latestFullSvg = data.fullSVG;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data.fullSVG, 'image/svg+xml');
+      const root = doc.documentElement;
+      if (root) {
+        const vb = root.getAttribute('viewBox');
+        if (vb) {
+          vectorCanvas.setAttribute('viewBox', vb);
+        }
+        vectorCanvas.innerHTML = root.innerHTML;
+      }
+    }
+
+    // Set up interactive timeline scrubber
+    if (shapeHistory.length > 0 && timelineSlider && timelineScrubberWrap) {
+      timelineSlider.min = 1;
+      timelineSlider.max = shapeHistory.length;
+      timelineSlider.value = shapeHistory.length;
+      if (timelineStepText) {
+        timelineStepText.textContent = `${shapeHistory.length} / ${shapeHistory.length}`;
+      }
+      timelineScrubberWrap.classList.remove('hidden');
+    }
+
+    if (btnRefine) {
+      btnRefine.classList.remove('hidden');
+      updateRefineButtonLabel();
+    }
+
+    if (activeViewMode === 'heatmap') {
+      updateErrorHeatmap();
+    }
+
+    showToast(`Complete! ${matchPct}% fidelity in ${data.duration.toFixed(1)}s`);
+  }
+
+  // ========================================================================
+  // Copy SVG & Export Handlers
+  // ========================================================================
+
+  btnCopySvg.addEventListener('click', async () => {
+    const svgCode = latestFullSvg || vectorCanvas.outerHTML;
+    try {
+      await navigator.clipboard.writeText(svgCode);
+      copyBtnText.textContent = 'Copied!';
+      showToast('SVG vector code copied to clipboard');
+      setTimeout(() => {
+        copyBtnText.textContent = 'Copy SVG';
+      }, 2000);
+    } catch (err) {
+      showToast('Could not copy SVG', '✕');
+    }
+  });
+
+  btnExportPng.addEventListener('click', () => {
+    window.location.href = '/api/export?format=png';
+    showToast('Exporting PNG raster...');
+  });
+
+  btnExportSvg.addEventListener('click', () => {
+    window.location.href = '/api/export?format=svg';
+    showToast('Exporting Vector SVG...');
+  });
+
+  // Animated SVG Timelapse Export
+  if (btnExportAnim) {
+    btnExportAnim.addEventListener('click', () => {
+      if (!shapeHistory || shapeHistory.length === 0) {
+        showToast('Synthesize vector art first to export animation', '⚠️');
+        return;
+      }
+      showToast('Generating standalone animated SVG timelapse...');
+      const w = currentDimensions.width || 1024;
+      const h = currentDimensions.height || 1024;
+      const bg = currentDimensions.bg || '#090a0d';
+
+      const totalDuration = Math.min(8.0, Math.max(2.5, shapeHistory.length * 0.025));
+      const stepDelay = totalDuration / shapeHistory.length;
+
+      let animSvg = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      animSvg += `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">\n`;
+      animSvg += `<style>\n`;
+      animSvg += `  @keyframes artFadeIn {\n`;
+      animSvg += `    0% { opacity: 0; transform: scale(0.98); }\n`;
+      animSvg += `    100% { opacity: 1; transform: scale(1); }\n`;
+      animSvg += `  }\n`;
+      animSvg += `  .art-shape {\n`;
+      animSvg += `    animation: artFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;\n`;
+      animSvg += `    opacity: 0;\n`;
+      animSvg += `    transform-origin: center;\n`;
+      animSvg += `  }\n`;
+      animSvg += `</style>\n`;
+      animSvg += `<rect width="${w}" height="${h}" fill="${bg}"/>\n`;
+      animSvg += `<g id="primitives">\n`;
+
+      shapeHistory.forEach((chunk, idx) => {
+        const delay = (idx * stepDelay).toFixed(3);
+        animSvg += `  <g class="art-shape" style="animation-delay: ${delay}s;">${chunk}</g>\n`;
+      });
+
+      animSvg += `</g>\n</svg>`;
+
+      const blob = new Blob([animSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `art-timelapse-${Date.now()}.svg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Animated SVG downloaded!');
+    });
+  }
+
+  // ========================================================================
+  // Ultra-HD 4K & Museum Print Master Export Controller
+  // ========================================================================
+
+  let selectedExportSize = 3840;
+  let selectedExportTexture = 'none';
+  let selectedExportTitle = '4K UHD Master';
+
+  function updateExportSpecs() {
+    const w = currentDimensions.width || 1024;
+    const h = currentDimensions.height || 1024;
+    const aspect = w / h;
+    let tw, th;
+    if (aspect >= 1.0) {
+      tw = selectedExportSize;
+      th = Math.round(selectedExportSize / aspect);
+    } else {
+      tw = Math.round(selectedExportSize * aspect);
+      th = selectedExportSize;
+    }
+
+    if (exportGalleryMat && exportGalleryMat.checked) {
+      const margin = Math.max(24, Math.round(tw * 0.04));
+      tw += margin * 2;
+      th += margin * 2;
+    }
+
+    const inW = (tw / 300).toFixed(1);
+    const inH = (th / 300).toFixed(1);
+    const cmW = (inW * 2.54).toFixed(1);
+    const cmH = (inH * 2.54).toFixed(1);
+
+    if (exportSpecDims) {
+      exportSpecDims.textContent = `${tw} × ${th} px`;
+    }
+    if (exportSpecPhysical) {
+      exportSpecPhysical.textContent = `${inW} × ${inH} in · ${cmW} × ${cmH} cm`;
+    }
+    if (exportSubmitText) {
+      exportSubmitText.textContent = `Download ${selectedExportTitle} (${tw}×${th}px)`;
+    }
+  }
+
+  if (btnExport4k && exportModal) {
+    btnExport4k.addEventListener('click', () => {
+      if (!latestFullSvg && shapeHistory.length === 0) {
+        showToast('Run synthesis first to export print master', '⚠️');
+        return;
+      }
+      updateExportSpecs();
+      exportModal.showModal();
+    });
+
+    if (btnCloseExportModal) {
+      btnCloseExportModal.addEventListener('click', () => {
+        exportModal.close();
+      });
+    }
+
+    exportModal.addEventListener('click', (e) => {
+      if (e.target === exportModal) {
+        exportModal.close();
+      }
+    });
+
+    exportResCards.forEach(card => {
+      card.addEventListener('click', () => {
+        exportResCards.forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectedExportSize = parseInt(card.getAttribute('data-size')) || 3840;
+        const titleEl = card.querySelector('.export-opt-title');
+        if (titleEl) {
+          selectedExportTitle = titleEl.textContent;
+        }
+        updateExportSpecs();
+      });
+    });
+
+    exportTexturePills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        exportTexturePills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        selectedExportTexture = pill.getAttribute('data-texture') || 'none';
+      });
+    });
+
+    if (exportGalleryMat) {
+      exportGalleryMat.addEventListener('change', updateExportSpecs);
+    }
+
+    if (btnDoExportMaster) {
+      btnDoExportMaster.addEventListener('click', () => {
+        exportModal.close();
+        const isMat = exportGalleryMat ? exportGalleryMat.checked : false;
+        showToast(`Rendering ${selectedExportTitle}... Generating print master.`);
+        window.location.href = `/api/export?format=png&size=${selectedExportSize}&texture=${selectedExportTexture}&mat=${isMat}`;
+      });
+    }
+  }
+
+  // ========================================================================
+  // Detail Focus Brush Controller (Mask Painting for Curtains / Features)
+  // ========================================================================
+
+  if (brushSize && brushSizeVal) {
+    brushSize.addEventListener('input', (e) => {
+      currentBrushRadius = parseInt(e.target.value) || 35;
+      brushSizeVal.textContent = `${currentBrushRadius}px`;
+    });
+  }
+
+  if (btnToggleBrush && brushToolbar && maskCanvas) {
+    btnToggleBrush.addEventListener('click', () => {
+      isBrushActive = !isBrushActive;
+      btnToggleBrush.classList.toggle('active', isBrushActive);
+      brushToolbar.classList.toggle('hidden', !isBrushActive);
+      canvasWrapper.classList.toggle('brush-active', isBrushActive);
+      if (isBrushActive) {
+        showToast('Focus Brush: Paint over curtains or subjects to lock details');
+      }
+    });
+
+    if (btnClearMask) {
+      btnClearMask.addEventListener('click', () => {
+        if (maskCtx) {
+          maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+        }
+        hasUserMask = false;
+        updateRefineButtonLabel();
+        showToast('Priority detail mask cleared');
+      });
+    }
+
+    function getMaskCoords(e) {
+      const rect = maskCanvas.getBoundingClientRect();
+      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+      const scaleX = maskCanvas.width / (rect.width || 1);
+      const scaleY = maskCanvas.height / (rect.height || 1);
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    function drawMaskStroke(x, y, fromX, fromY) {
+      if (!maskCtx) return;
+      maskCtx.save();
+      maskCtx.lineCap = 'round';
+      maskCtx.lineJoin = 'round';
+      // Coral-amber glowing highlight for user visibility
+      maskCtx.strokeStyle = 'rgba(234, 67, 53, 0.75)';
+      maskCtx.fillStyle = 'rgba(234, 67, 53, 0.75)';
+
+      const rect = maskCanvas.getBoundingClientRect();
+      const scale = maskCanvas.width / (rect.width || 1);
+      const r = currentBrushRadius * scale;
+
+      maskCtx.beginPath();
+      if (fromX !== undefined && fromY !== undefined) {
+        maskCtx.lineWidth = r * 2;
+        maskCtx.moveTo(fromX, fromY);
+        maskCtx.lineTo(x, y);
+        maskCtx.stroke();
+      } else {
+        maskCtx.arc(x, y, r, 0, Math.PI * 2);
+        maskCtx.fill();
+      }
+      maskCtx.restore();
+      hasUserMask = true;
+      updateRefineButtonLabel();
+    }
+
+    maskCanvas.addEventListener('pointerdown', (e) => {
+      if (!isBrushActive) return;
+      e.preventDefault();
+      isDrawingMask = true;
+      const coords = getMaskCoords(e);
+      lastBrushX = coords.x;
+      lastBrushY = coords.y;
+      drawMaskStroke(coords.x, coords.y);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isBrushActive || !isDrawingMask) return;
+      const coords = getMaskCoords(e);
+      drawMaskStroke(coords.x, coords.y, lastBrushX, lastBrushY);
+      lastBrushX = coords.x;
+      lastBrushY = coords.y;
+    });
+
+    const stopDrawingMask = () => {
+      isDrawingMask = false;
+    };
+    window.addEventListener('pointerup', stopDrawingMask);
+    window.addEventListener('pointercancel', stopDrawingMask);
+  }
+
+  // ========================================================================
+  // Blueprint / Wireframe Mode Controller
+  // ========================================================================
+
+  if (btnToggleWireframe) {
+    btnToggleWireframe.addEventListener('click', () => {
+      const isWire = vectorCanvas.classList.toggle('wireframe-mode');
+      btnToggleWireframe.classList.toggle('active', isWire);
+      showToast(isWire ? 'Blueprint wireframe mode active' : 'Wireframe mode deactivated');
+    });
+  }
+
+  // ========================================================================
+  // Live Hardware-Accelerated Tactile Texture Controller
+  // ========================================================================
+
+  if (btnToggleTexture) {
+    btnToggleTexture.addEventListener('click', () => {
+      if (currentTextureMode === 'none') {
+        currentTextureMode = 'paper';
+        vectorCanvas.classList.remove('texture-canvas');
+        vectorCanvas.classList.add('texture-paper');
+        btnToggleTexture.classList.add('active');
+        showToast('Tactile Texture: Museum Cotton Rag Paper (100% Cotton, 310gsm)');
+      } else if (currentTextureMode === 'paper') {
+        currentTextureMode = 'canvas';
+        vectorCanvas.classList.remove('texture-paper');
+        vectorCanvas.classList.add('texture-canvas');
+        btnToggleTexture.classList.add('active');
+        showToast('Tactile Texture: Belgian Linen Canvas (Coarse Impasto Weave)');
+      } else {
+        currentTextureMode = 'none';
+        vectorCanvas.classList.remove('texture-paper', 'texture-canvas');
+        btnToggleTexture.classList.remove('active');
+        showToast('Tactile Texture: Pure Clean Vector (No Texture)');
+      }
+    });
+  }
+
+  // ========================================================================
+  // Timeline Scrubber & Step Replay Engine
+  // ========================================================================
+
+  function renderTimelineFrame(frameIndex) {
+    const count = Math.max(0, Math.min(shapeHistory.length, frameIndex));
+    vectorCanvas.innerHTML = baseBgRect + shapeHistory.slice(0, count).join('');
+    if (timelineStepText) {
+      timelineStepText.textContent = `${count} / ${shapeHistory.length}`;
+    }
+    metricShapes.textContent = `${count} / ${shapeHistory.length}`;
+  }
+
+  function stopTimelinePlay() {
+    if (timelineInterval) {
+      clearInterval(timelineInterval);
+      timelineInterval = null;
+    }
+    isTimelinePlaying = false;
+    if (btnTimelinePlay) {
+      btnTimelinePlay.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    }
+  }
+
+  function startTimelinePlay() {
+    if (shapeHistory.length === 0) return;
+    isTimelinePlaying = true;
+    if (btnTimelinePlay) {
+      btnTimelinePlay.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    }
+
+    let current = parseInt(timelineSlider.value);
+    if (current >= shapeHistory.length) {
+      current = 0;
+    }
+
+    timelineInterval = setInterval(() => {
+      current += 1;
+      if (current > shapeHistory.length) {
+        stopTimelinePlay();
+        return;
+      }
+      timelineSlider.value = current;
+      renderTimelineFrame(current);
+    }, 28);
+  }
+
+  if (timelineSlider) {
+    timelineSlider.addEventListener('input', (e) => {
+      stopTimelinePlay();
+      renderTimelineFrame(parseInt(e.target.value));
+    });
+  }
+
+  if (btnTimelinePlay) {
+    btnTimelinePlay.addEventListener('click', () => {
+      if (isTimelinePlaying) {
+        stopTimelinePlay();
+      } else {
+        startTimelinePlay();
+      }
+    });
+  }
+
+  // ========================================================================
+  // Keyboard Shortcuts & Modal Dialog
+  // ========================================================================
+
+  btnShortcutsModal.addEventListener('click', () => {
+    shortcutsModal.showModal();
+  });
+
+  btnCloseModal.addEventListener('click', () => {
+    shortcutsModal.close();
+  });
+
+  shortcutsModal.addEventListener('click', (e) => {
+    if (e.target === shortcutsModal) {
+      shortcutsModal.close();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    // Avoid triggering when user focuses an input
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      e.preventDefault();
+      shortcutsModal.open ? shortcutsModal.close() : shortcutsModal.showModal();
+    } else if (e.key === 'Escape' && shortcutsModal.open) {
+      shortcutsModal.close();
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      if (!isRunning && shapeHistory.length > 0 && btnRefine) {
+        btnRefine.click();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isRunning) {
+        btnStop.click();
+      } else {
+        btnStart.click();
+      }
+    } else if (e.code === 'Space') {
+      e.preventDefault();
+      // Toggle between split and vector only
+      if (activeViewMode === 'split') {
+        setActiveViewSegment('vector');
+      } else {
+        setActiveViewSegment('split');
+      }
+    } else if (e.key === 'ArrowLeft') {
+      setWipePosition(wipeRatio - 0.05);
+    } else if (e.key === 'ArrowRight') {
+      setWipePosition(wipeRatio + 0.05);
+    } else if (e.key === 'c' || e.key === 'C') {
+      btnCopySvg.click();
+    } else if (e.key === 'r' || e.key === 'R') {
+      btnLoadSample.click();
+    } else if (e.key === 'b' || e.key === 'B') {
+      if (btnToggleBrush) btnToggleBrush.click();
+    } else if (e.key === 'w' || e.key === 'W') {
+      if (btnToggleWireframe) btnToggleWireframe.click();
+    } else if (e.key === 'h' || e.key === 'H') {
+      if (activeViewMode === 'heatmap') {
+        setActiveViewSegment('split');
+      } else {
+        setActiveViewSegment('heatmap');
+      }
+    } else if (e.key === 't' || e.key === 'T') {
+      if (btnToggleTexture) btnToggleTexture.click();
+    } else if (e.key === '+' || e.key === '=') {
+      btnZoomIn.click();
+    } else if (e.key === '-' || e.key === '_') {
+      btnZoomOut.click();
+    } else if (e.key === '0') {
+      btnZoomFit.click();
+    } else if (['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].includes(e.key)) {
+      const modeMap = {
+        '1': 1, '2': 6, '3': 9, '4': 2, '5': 3,
+        '6': 4, '7': 5, '8': 7, '9': 8, '0': 0
+      };
+      if (modeMap[e.key] !== undefined) {
+        selectMode(modeMap[e.key]);
+      }
+    }
+  });
+
+  // ========================================================================
+  // Theme Management (Dark Mode Default + Toggle)
+  // ========================================================================
+
+  const btnThemeToggle = document.getElementById('btn-theme-toggle');
+  const iconSun = btnThemeToggle ? btnThemeToggle.querySelector('.icon-sun') : null;
+  const iconMoon = btnThemeToggle ? btnThemeToggle.querySelector('.icon-moon') : null;
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('art-studio-theme', theme);
+    if (iconSun && iconMoon) {
+      if (theme === 'dark') {
+        iconSun.classList.remove('hidden');
+        iconMoon.classList.add('hidden');
+      } else {
+        iconSun.classList.add('hidden');
+        iconMoon.classList.remove('hidden');
+      }
+    }
+  }
+
+  // Load saved theme or default to dark mode
+  const savedTheme = localStorage.getItem('art-studio-theme') || 'dark';
+  applyTheme(savedTheme);
+
+  if (btnThemeToggle) {
+    btnThemeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      showToast(`Switched to ${next} mode`);
+    });
+  }
+
+  // Automatically load sample reference on boot
+  btnLoadSample.click();
+});
