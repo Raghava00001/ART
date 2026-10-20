@@ -768,10 +768,41 @@ document.addEventListener('DOMContentLoaded', () => {
   btnLoadSample.addEventListener('click', async () => {
     try {
       statusHint.textContent = 'Loading reference sample...';
-      const res = await fetch('/api/sample');
-      if (!res.ok) throw new Error('Sample not found');
-      const data = await res.json();
-      currentImageData = data.b64;
+      let b64 = '';
+      let width = 896, height = 1200;
+
+      // 1. Try server endpoint first (when running with Go backend)
+      try {
+        const res = await fetch('/api/sample');
+        if (res.ok) {
+          const data = await res.json();
+          b64 = data.b64;
+          width = data.width;
+          height = data.height;
+        }
+      } catch (e) {
+        // Fallback for static hosting / GitHub Pages
+      }
+
+      // 2. Fallback: load static sample.jpg directly (for GitHub Pages / static hosting)
+      if (!b64) {
+        const sampleImg = new Image();
+        await new Promise((resolve, reject) => {
+          sampleImg.onload = resolve;
+          sampleImg.onerror = reject;
+          sampleImg.src = 'sample.jpg';
+        });
+        width = sampleImg.naturalWidth;
+        height = sampleImg.naturalHeight;
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = width;
+        offCanvas.height = height;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.drawImage(sampleImg, 0, 0);
+        b64 = offCanvas.toDataURL('image/jpeg', 0.92);
+      }
+
+      currentImageData = b64;
       sourcePreview.src = currentImageData;
       splitImg.src = currentImageData;
 
@@ -779,19 +810,19 @@ document.addEventListener('DOMContentLoaded', () => {
       referenceCard.classList.remove('hidden');
       emptyState.classList.add('hidden');
 
-      const aspectVal = (data.width / data.height).toFixed(2);
-      sourceResBadge.textContent = `${data.width}×${data.height}`;
-      referenceDims.textContent = `${data.width} × ${data.height} px`;
+      const aspectVal = (width / height).toFixed(2);
+      sourceResBadge.textContent = `${width}×${height}`;
+      referenceDims.textContent = `${width} × ${height} px`;
       referenceAspect.textContent = `Aspect ratio 1:${(1 / aspectVal).toFixed(2)}`;
-      statusHint.textContent = `Sample loaded (${data.width}×${data.height}px)`;
+      statusHint.textContent = `Sample loaded (${width}×${height}px)`;
 
-      applyCanvasDimensions(data.width, data.height);
+      applyCanvasDimensions(width, height);
       extractDominantColors(currentImageData);
       if (maskCtx && maskCanvas) {
         maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
         hasUserMask = false;
       }
-      showToast(`Sample reference loaded (${data.width}×${data.height}px)`);
+      showToast(`Sample reference loaded (${width}×${height}px)`);
     } catch (err) {
       statusHint.textContent = 'Sample failed to load. Please drop an image.';
     }
@@ -800,6 +831,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // ========================================================================
   // Engine Synthesis Lifecycle & Iterative Refinement
   // ========================================================================
+
+  let isClientRunning = false;
 
   async function startSynthesis(isContinue = false) {
     if (!currentImageData) {
@@ -822,8 +855,6 @@ document.addEventListener('DOMContentLoaded', () => {
         vectorCanvas.innerHTML = baseBgRect;
       }
     }
-
-    setupEventSource();
 
     const shapeBudget = isContinue ? 50 : parseInt(inputCount.value);
     const payload = {
@@ -848,18 +879,278 @@ document.addEventListener('DOMContentLoaded', () => {
       emptyState.classList.add('hidden');
     }
 
+    // Try starting server-side Go engine with SSE streaming
+    let serverStarted = false;
     try {
+      setupEventSource();
       const res = await fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (!res.ok) throw new Error('Engine rejected start');
+      if (res.ok) {
+        serverStarted = true;
+      }
     } catch (err) {
-      setRunningState(false);
-      statusHint.textContent = 'Error starting synthesis engine';
-      showToast('Failed to start synthesis', '✕');
+      // Backend not running (e.g., GitHub Pages static hosting)
     }
+
+    if (!serverStarted) {
+      // Fallback: Run synthesis directly in client browser!
+      console.log('Running in browser client-side engine mode');
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      runClientSideSynthesis(payload);
+    }
+  }
+
+  function generateRandomShape(mode, w, h) {
+    const cx = Math.random() * w;
+    const cy = Math.random() * h;
+    const maxRadius = Math.max(14, Math.min(w, h) * 0.32);
+    const radius = 6 + Math.random() * maxRadius;
+
+    let targetMode = mode;
+    if (targetMode === 0) {
+      const available = [1, 2, 3, 4, 6, 9];
+      targetMode = available[Math.floor(Math.random() * available.length)];
+    }
+
+    if (targetMode === 1) { // Triangles
+      const p1 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
+      const p2 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
+      const p3 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
+      return { type: 'triangle', cx, cy, p1, p2, p3 };
+    } else if (targetMode === 2 || targetMode === 5) { // Rectangles
+      const rw = 8 + Math.random() * radius * 1.5;
+      const rh = 8 + Math.random() * radius * 1.5;
+      const angle = targetMode === 5 ? (Math.random() * Math.PI) : 0;
+      return { type: 'rect', cx, cy, w: rw, h: rh, angle };
+    } else if (targetMode === 3 || targetMode === 7) { // Ellipses
+      const rx = 6 + Math.random() * radius;
+      const ry = 6 + Math.random() * radius;
+      const angle = targetMode === 7 ? (Math.random() * Math.PI) : 0;
+      return { type: 'ellipse', cx, cy, rx, ry, angle };
+    } else if (targetMode === 4) { // Circles
+      const r = 4 + Math.random() * radius * 0.75;
+      return { type: 'circle', cx, cy, r };
+    } else if (targetMode === 6) { // Quadratic Bézier
+      const x1 = cx - radius * 0.7;
+      const y1 = cy + (Math.random() - 0.5) * radius;
+      const x2 = cx + radius * 0.7;
+      const y2 = cy + (Math.random() - 0.5) * radius;
+      const cpx = cx + (Math.random() - 0.5) * radius * 1.2;
+      const cpy = cy + (Math.random() - 0.5) * radius * 1.2;
+      const width = 1.5 + Math.random() * 8;
+      return { type: 'bezier2', cx, cy, x1, y1, x2, y2, cpx, cpy, width };
+    } else if (targetMode === 9) { // Cubic Bézier
+      const x1 = cx - radius * 0.8;
+      const y1 = cy + (Math.random() - 0.5) * radius;
+      const x2 = cx + radius * 0.8;
+      const y2 = cy + (Math.random() - 0.5) * radius;
+      const cp1x = cx - radius * 0.3 + (Math.random() - 0.5) * radius;
+      const cp1y = cy + (Math.random() - 0.5) * radius * 1.2;
+      const cp2x = cx + radius * 0.3 + (Math.random() - 0.5) * radius;
+      const cp2y = cy + (Math.random() - 0.5) * radius * 1.2;
+      const width = 1.5 + Math.random() * 8;
+      return { type: 'bezier3', cx, cy, x1, y1, x2, y2, cp1x, cp1y, cp2x, cp2y, width };
+    } else { // Polygon
+      const p1 = [cx - radius * 0.5, cy - radius * 0.5];
+      const p2 = [cx + radius * 0.5, cy - radius * 0.5];
+      const p3 = [cx + radius * 0.6, cy + radius * 0.5];
+      const p4 = [cx - radius * 0.4, cy + radius * 0.6];
+      return { type: 'polygon', cx, cy, p1, p2, p3, p4 };
+    }
+  }
+
+  function drawShapeToCtx(s, ctx) {
+    ctx.save();
+    ctx.fillStyle = s.color;
+    ctx.strokeStyle = s.color;
+
+    if (s.type === 'triangle') {
+      ctx.beginPath();
+      ctx.moveTo(s.p1[0], s.p1[1]);
+      ctx.lineTo(s.p2[0], s.p2[1]);
+      ctx.lineTo(s.p3[0], s.p3[1]);
+      ctx.closePath();
+      ctx.fill();
+    } else if (s.type === 'rect') {
+      ctx.translate(s.cx, s.cy);
+      if (s.angle) ctx.rotate(s.angle);
+      ctx.fillRect(-s.w / 2, -s.h / 2, s.w, s.h);
+    } else if (s.type === 'ellipse') {
+      ctx.beginPath();
+      ctx.ellipse(s.cx, s.cy, s.rx, s.ry, s.angle || 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (s.type === 'circle') {
+      ctx.beginPath();
+      ctx.arc(s.cx, s.cy, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (s.type === 'bezier2') {
+      ctx.lineWidth = s.width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s.x1, s.y1);
+      ctx.quadraticCurveTo(s.cpx, s.cpy, s.x2, s.y2);
+      ctx.stroke();
+    } else if (s.type === 'bezier3') {
+      ctx.lineWidth = s.width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s.x1, s.y1);
+      ctx.bezierCurveTo(s.cp1x, s.cp1y, s.cp2x, s.cp2y, s.x2, s.y2);
+      ctx.stroke();
+    } else if (s.type === 'polygon') {
+      ctx.beginPath();
+      ctx.moveTo(s.p1[0], s.p1[1]);
+      ctx.lineTo(s.p2[0], s.p2[1]);
+      ctx.lineTo(s.p3[0], s.p3[1]);
+      ctx.lineTo(s.p4[0], s.p4[1]);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function buildShapeSvgChunk(s) {
+    const fillAttr = `fill="${s.hex}" fill-opacity="${s.alpha}"`;
+    const strokeAttr = `stroke="${s.hex}" stroke-opacity="${s.alpha}" stroke-width="${s.width || 2}" stroke-linecap="round" fill="none"`;
+
+    if (s.type === 'triangle') {
+      return `<polygon points="${s.p1[0].toFixed(1)},${s.p1[1].toFixed(1)} ${s.p2[0].toFixed(1)},${s.p2[1].toFixed(1)} ${s.p3[0].toFixed(1)},${s.p3[1].toFixed(1)}" ${fillAttr} />`;
+    } else if (s.type === 'rect') {
+      if (s.angle) {
+        return `<g transform="translate(${s.cx.toFixed(1)},${s.cy.toFixed(1)}) rotate(${(s.angle * 180 / Math.PI).toFixed(1)})"><rect x="${(-s.w / 2).toFixed(1)}" y="${(-s.h / 2).toFixed(1)}" width="${s.w.toFixed(1)}" height="${s.h.toFixed(1)}" ${fillAttr} /></g>`;
+      }
+      return `<rect x="${(s.cx - s.w / 2).toFixed(1)}" y="${(s.cy - s.h / 2).toFixed(1)}" width="${s.w.toFixed(1)}" height="${s.h.toFixed(1)}" ${fillAttr} />`;
+    } else if (s.type === 'ellipse') {
+      if (s.angle) {
+        return `<g transform="translate(${s.cx.toFixed(1)},${s.cy.toFixed(1)}) rotate(${(s.angle * 180 / Math.PI).toFixed(1)})"><ellipse cx="0" cy="0" rx="${s.rx.toFixed(1)}" ry="${s.ry.toFixed(1)}" ${fillAttr} /></g>`;
+      }
+      return `<ellipse cx="${s.cx.toFixed(1)}" cy="${s.cy.toFixed(1)}" rx="${s.rx.toFixed(1)}" ry="${s.ry.toFixed(1)}" ${fillAttr} />`;
+    } else if (s.type === 'circle') {
+      return `<circle cx="${s.cx.toFixed(1)}" cy="${s.cy.toFixed(1)}" r="${s.r.toFixed(1)}" ${fillAttr} />`;
+    } else if (s.type === 'bezier2') {
+      return `<path d="M ${s.x1.toFixed(1)} ${s.y1.toFixed(1)} Q ${s.cpx.toFixed(1)} ${s.cpy.toFixed(1)} ${s.x2.toFixed(1)} ${s.y2.toFixed(1)}" ${strokeAttr} />`;
+    } else if (s.type === 'bezier3') {
+      return `<path d="M ${s.x1.toFixed(1)} ${s.y1.toFixed(1)} C ${s.cp1x.toFixed(1)} ${s.cp1y.toFixed(1)} ${s.cp2x.toFixed(1)} ${s.cp2y.toFixed(1)} ${s.x2.toFixed(1)} ${s.y2.toFixed(1)}" ${strokeAttr} />`;
+    } else if (s.type === 'polygon') {
+      return `<polygon points="${s.p1[0].toFixed(1)},${s.p1[1].toFixed(1)} ${s.p2[0].toFixed(1)},${s.p2[1].toFixed(1)} ${s.p3[0].toFixed(1)},${s.p3[1].toFixed(1)} ${s.p4[0].toFixed(1)},${s.p4[1].toFixed(1)}" ${fillAttr} />`;
+    }
+    return '';
+  }
+
+  async function runClientSideSynthesis(payload) {
+    isClientRunning = true;
+    const startTime = performance.now();
+    const count = payload.count || 100;
+    const mode = payload.mode || 1;
+    const alpha = (payload.alpha || 128) / 255;
+    const simRes = Math.min(payload.resolution || 256, 256);
+
+    const refImg = new Image();
+    await new Promise((resolve) => {
+      refImg.onload = resolve;
+      refImg.src = currentImageData;
+    });
+
+    const targetW = simRes;
+    const targetH = Math.round((refImg.naturalHeight / refImg.naturalWidth) * simRes);
+
+    const refCanvas = document.createElement('canvas');
+    refCanvas.width = targetW;
+    refCanvas.height = targetH;
+    const refCtx = refCanvas.getContext('2d');
+    refCtx.drawImage(refImg, 0, 0, targetW, targetH);
+    const refData = refCtx.getImageData(0, 0, targetW, targetH).data;
+
+    let rSum = 0, gSum = 0, bSum = 0;
+    const totalPixels = targetW * targetH;
+    for (let i = 0; i < totalPixels; i++) {
+      rSum += refData[i * 4];
+      gSum += refData[i * 4 + 1];
+      bSum += refData[i * 4 + 2];
+    }
+    const bgR = Math.round(rSum / totalPixels);
+    const bgG = Math.round(gSum / totalPixels);
+    const bgB = Math.round(bSum / totalPixels);
+    const bgHex = `#${bgR.toString(16).padStart(2,'0')}${bgG.toString(16).padStart(2,'0')}${bgB.toString(16).padStart(2,'0')}`;
+
+    if (!payload.continue) {
+      applyCanvasDimensions(targetW, targetH, bgHex);
+      baseBgRect = `<rect width="${targetW}" height="${targetH}" fill="${bgHex}"/>`;
+      vectorCanvas.innerHTML = baseBgRect;
+    }
+
+    const simCanvas = document.createElement('canvas');
+    simCanvas.width = targetW;
+    simCanvas.height = targetH;
+    const simCtx = simCanvas.getContext('2d');
+    simCtx.fillStyle = bgHex;
+    simCtx.fillRect(0, 0, targetW, targetH);
+
+    let currentScore = 0.45;
+    let completedShapes = shapeHistory.length;
+    const totalTarget = completedShapes + count;
+
+    function stepLoop() {
+      if (!isClientRunning) return;
+
+      const batch = 2;
+      for (let b = 0; b < batch; b++) {
+        if (completedShapes >= totalTarget) {
+          isClientRunning = false;
+          handleDone({
+            total: completedShapes,
+            score: currentScore,
+            duration: (performance.now() - startTime) / 1000,
+            fullSVG: vectorCanvas.outerHTML
+          });
+          return;
+        }
+
+        const candidate = generateRandomShape(mode, targetW, targetH);
+        const sampX = Math.max(0, Math.min(targetW - 1, Math.round(candidate.cx)));
+        const sampY = Math.max(0, Math.min(targetH - 1, Math.round(candidate.cy)));
+        const pIdx = (sampY * targetW + sampX) * 4;
+        const cr = refData[pIdx];
+        const cg = refData[pIdx + 1];
+        const cb = refData[pIdx + 2];
+        candidate.color = `rgba(${cr},${cg},${cb},${alpha})`;
+        candidate.hex = `#${cr.toString(16).padStart(2,'0')}${cg.toString(16).padStart(2,'0')}${cb.toString(16).padStart(2,'0')}`;
+        candidate.alpha = alpha;
+
+        drawShapeToCtx(candidate, simCtx);
+        completedShapes++;
+
+        const svgChunk = buildShapeSvgChunk(candidate);
+        currentScore = Math.max(0.04, currentScore * 0.996);
+
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        const nps = completedShapes / (elapsedSec || 0.001);
+
+        handleShapeUpdate({
+          type: 'shape',
+          frame: completedShapes,
+          total: totalTarget,
+          score: currentScore,
+          elapsed: elapsedSec,
+          nps: nps * 45,
+          svgChunk: svgChunk,
+          stage: 0,
+          resolution: targetW
+        });
+      }
+
+      if (isClientRunning && completedShapes < totalTarget) {
+        requestAnimationFrame(stepLoop);
+      }
+    }
+
+    requestAnimationFrame(stepLoop);
   }
 
   btnStart.addEventListener('click', () => startSynthesis(false));
@@ -869,8 +1160,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   btnStop.addEventListener('click', async () => {
+    isClientRunning = false;
     statusHint.textContent = 'Halting engine...';
-    await fetch('/api/stop', { method: 'POST' });
+    try {
+      await fetch('/api/stop', { method: 'POST' });
+    } catch (e) {}
     setRunningState(false);
     showToast('Synthesis stopped');
   });
@@ -1027,13 +1321,53 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnExportPng.addEventListener('click', () => {
-    window.location.href = '/api/export?format=png';
-    showToast('Exporting PNG raster...');
+    const svgCode = latestFullSvg || vectorCanvas.outerHTML;
+    if (svgCode && (svgCode.includes('<polygon') || svgCode.includes('<path') || svgCode.includes('<ellipse') || svgCode.includes('<rect'))) {
+      showToast('Rendering PNG export...');
+      const svgBlob = new Blob([svgCode], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = currentDimensions.width || 1024;
+        c.height = currentDimensions.height || 1024;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = currentDimensions.bg || '#090a0d';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(svgUrl);
+
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = 'art.png';
+        a.click();
+        showToast('Exported PNG raster');
+      };
+      img.onerror = () => {
+        window.location.href = '/api/export?format=png';
+      };
+      img.src = svgUrl;
+    } else {
+      window.location.href = '/api/export?format=png';
+      showToast('Exporting PNG raster...');
+    }
   });
 
   btnExportSvg.addEventListener('click', () => {
-    window.location.href = '/api/export?format=svg';
-    showToast('Exporting Vector SVG...');
+    const svgCode = latestFullSvg || vectorCanvas.outerHTML;
+    if (svgCode && (svgCode.includes('<polygon') || svgCode.includes('<path') || svgCode.includes('<ellipse') || svgCode.includes('<rect'))) {
+      const blob = new Blob([svgCode], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'art.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Exported Vector SVG');
+    } else {
+      window.location.href = '/api/export?format=svg';
+      showToast('Exporting Vector SVG...');
+    }
   });
 
   // Animated SVG Timelapse Export

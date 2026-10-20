@@ -1,6 +1,9 @@
 # ART — Autonomous Geometric Vector Art Engine
 
+[![Live Web App](https://img.shields.io/badge/Live%20Demo-Try%20ART%20Studio%20Online-00C853?style=for-the-badge&logo=googlechrome&logoColor=white)](https://raghava00001.github.io/ART/)
+
 [![CI](https://github.com/Raghava00001/ART/actions/workflows/ci.yml/badge.svg)](https://github.com/Raghava00001/ART/actions)
+[![GitHub Pages](https://github.com/Raghava00001/ART/actions/workflows/deploy-pages.yml/badge.svg)](https://raghava00001.github.io/ART/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 [![Security: Hardened](https://img.shields.io/badge/Security-Hardened-success.svg)](SECURITY.md)
 [![Tech Stack](https://img.shields.io/badge/Architecture-Tech%20Stack%20Deep%20Dive-8A2BE2.svg)](TECH_STACK.md)
@@ -10,6 +13,11 @@
 **ART** is a high-performance vector synthesis engine that transforms raster images into beautiful geometric artwork and calligraphic strokes using hill-climbing stochastic optimization.
 
 It pairs a multi-core Go simulation engine with an interactive, glassmorphic dark-mode web atelier that streams vector artwork in real-time.
+
+> ### 🎨 Try ART Studio Online Now!
+> **Experience the live interactive web studio directly in your browser:**  
+> 👉 **[https://raghava00001.github.io/ART/](https://raghava00001.github.io/ART/)**  
+> *No install needed. Drag & drop any photo or use the sample portrait to watch vector art synthesize live.*
 
 ---
 
