@@ -133,6 +133,42 @@ document.addEventListener('DOMContentLoaded', () => {
   let isTimelinePlaying = false;
   let timelineInterval = null;
   let baseBgRect = '';
+  let wasmWorker = null;
+  let isWasmWorkerReady = false;
+  let isClientRunning = false;
+
+  function initWasmWorker() {
+    try {
+      wasmWorker = new Worker('worker.js');
+      wasmWorker.onmessage = (e) => {
+        const data = e.data;
+        if (data.type === 'wasm_ready') {
+          console.log('Go WebAssembly engine ready in background worker.');
+          isWasmWorkerReady = true;
+          showToast('WebAssembly Engine Ready', '⚡');
+        } else if (data.type === 'init') {
+          handleInit(data);
+        } else if (data.type === 'shape') {
+          handleShapeUpdate(data);
+        } else if (data.type === 'done') {
+          handleDone(data);
+        } else if (data.type === 'cancelled') {
+          setRunningState(false);
+          statusHint.textContent = 'Synthesis paused.';
+        } else if (data.type === 'wasm_not_ready' || data.type === 'error') {
+          console.warn('Wasm worker notice:', data.error);
+        }
+      };
+      wasmWorker.onerror = (err) => {
+        console.warn('Wasm worker unavailable, using Canvas hill-climbing fallback:', err);
+        isWasmWorkerReady = false;
+      };
+    } catch (err) {
+      console.warn('Worker initialization skipped:', err);
+    }
+  }
+
+  initWasmWorker();
 
   const modeNames = {
     1: 'Triangles',
@@ -832,8 +868,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Engine Synthesis Lifecycle & Iterative Refinement
   // ========================================================================
 
-  let isClientRunning = false;
-
   async function startSynthesis(isContinue = false) {
     if (!currentImageData) {
       showToast('Please upload or load an image first', '⚠️');
@@ -896,21 +930,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!serverStarted) {
-      // Fallback: Run synthesis directly in client browser!
-      console.log('Running in browser client-side engine mode');
       if (eventSource) {
         eventSource.close();
         eventSource = null;
       }
-      runClientSideSynthesis(payload);
+
+      if (isWasmWorkerReady && wasmWorker) {
+        console.log('Running via Go WebAssembly background worker');
+        statusHint.textContent = 'Synthesizing with WebAssembly Go engine...';
+        wasmWorker.postMessage({ action: 'start', payload });
+      } else {
+        console.log('Running via client-side hill-climbing optimizer');
+        statusHint.textContent = 'Synthesizing with client-side optimizer...';
+        runClientSideSynthesis(payload);
+      }
     }
   }
 
-  function generateRandomShape(mode, w, h) {
-    const cx = Math.random() * w;
-    const cy = Math.random() * h;
-    const maxRadius = Math.max(14, Math.min(w, h) * 0.32);
-    const radius = 6 + Math.random() * maxRadius;
+  function getShapeBBox(s, w, h) {
+    let minX = 0, minY = 0, maxX = w, maxY = h;
+    if (s.type === 'triangle' || s.type === 'polygon') {
+      const pts = s.type === 'triangle' ? [s.p1, s.p2, s.p3] : [s.p1, s.p2, s.p3, s.p4];
+      minX = Math.min(...pts.map(p => p[0]));
+      minY = Math.min(...pts.map(p => p[1]));
+      maxX = Math.max(...pts.map(p => p[0]));
+      maxY = Math.max(...pts.map(p => p[1]));
+    } else if (s.type === 'rect') {
+      const diag = Math.hypot(s.w, s.h) / 2;
+      minX = s.cx - diag;
+      maxX = s.cx + diag;
+      minY = s.cy - diag;
+      maxY = s.cy + diag;
+    } else if (s.type === 'ellipse') {
+      const maxR = Math.max(s.rx, s.ry);
+      minX = s.cx - maxR;
+      maxX = s.cx + maxR;
+      minY = s.cy - maxR;
+      maxY = s.cy + maxR;
+    } else if (s.type === 'circle') {
+      minX = s.cx - s.r;
+      maxX = s.cx + s.r;
+      minY = s.cy - s.r;
+      maxY = s.cy + s.r;
+    } else if (s.type === 'bezier2' || s.type === 'bezier3') {
+      const extra = (s.width || 2) + 4;
+      const xs = s.type === 'bezier2' ? [s.x1, s.x2, s.cpx] : [s.x1, s.x2, s.cp1x, s.cp2x];
+      const ys = s.type === 'bezier2' ? [s.y1, s.y2, s.cpy] : [s.y1, s.y2, s.cp1y, s.cp2y];
+      minX = Math.min(...xs) - extra;
+      maxX = Math.max(...xs) + extra;
+      minY = Math.min(...ys) - extra;
+      maxY = Math.max(...ys) + extra;
+    }
+    const x = Math.max(0, Math.floor(minX));
+    const y = Math.max(0, Math.floor(minY));
+    const bxW = Math.min(w - x, Math.ceil(maxX - x));
+    const bxH = Math.min(h - y, Math.ceil(maxY - y));
+    return { x, y, w: Math.max(1, bxW), h: Math.max(1, bxH) };
+  }
+
+  function generateCandidateAround(mode, cx, cy, w, h, progress) {
+    const scaleFactor = 1.0 - progress * 0.7; // Anneal from broad strokes to fine micro-details
+    const maxRadius = Math.max(10, Math.min(w, h) * 0.35 * scaleFactor);
+    const minRadius = Math.max(4, 8 * scaleFactor);
+    const radius = minRadius + Math.random() * (maxRadius - minRadius);
 
     let targetMode = mode;
     if (targetMode === 0) {
@@ -918,43 +1000,43 @@ document.addEventListener('DOMContentLoaded', () => {
       targetMode = available[Math.floor(Math.random() * available.length)];
     }
 
-    if (targetMode === 1) { // Triangles
-      const p1 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
-      const p2 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
-      const p3 = [cx + (Math.random() - 0.5) * radius * 2, cy + (Math.random() - 0.5) * radius * 2];
+    if (targetMode === 1) { // Triangle
+      const p1 = [Math.max(0, Math.min(w, cx + (Math.random() - 0.5) * radius * 2)), Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius * 2))];
+      const p2 = [Math.max(0, Math.min(w, cx + (Math.random() - 0.5) * radius * 2)), Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius * 2))];
+      const p3 = [Math.max(0, Math.min(w, cx + (Math.random() - 0.5) * radius * 2)), Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius * 2))];
       return { type: 'triangle', cx, cy, p1, p2, p3 };
-    } else if (targetMode === 2 || targetMode === 5) { // Rectangles
-      const rw = 8 + Math.random() * radius * 1.5;
-      const rh = 8 + Math.random() * radius * 1.5;
+    } else if (targetMode === 2 || targetMode === 5) { // Rectangle
+      const rw = Math.max(4, radius * (0.6 + Math.random() * 0.8));
+      const rh = Math.max(4, radius * (0.6 + Math.random() * 0.8));
       const angle = targetMode === 5 ? (Math.random() * Math.PI) : 0;
       return { type: 'rect', cx, cy, w: rw, h: rh, angle };
-    } else if (targetMode === 3 || targetMode === 7) { // Ellipses
-      const rx = 6 + Math.random() * radius;
-      const ry = 6 + Math.random() * radius;
+    } else if (targetMode === 3 || targetMode === 7) { // Ellipse
+      const rx = Math.max(4, radius * (0.5 + Math.random() * 0.7));
+      const ry = Math.max(4, radius * (0.5 + Math.random() * 0.7));
       const angle = targetMode === 7 ? (Math.random() * Math.PI) : 0;
       return { type: 'ellipse', cx, cy, rx, ry, angle };
-    } else if (targetMode === 4) { // Circles
-      const r = 4 + Math.random() * radius * 0.75;
+    } else if (targetMode === 4) { // Circle
+      const r = Math.max(3, radius * 0.6);
       return { type: 'circle', cx, cy, r };
     } else if (targetMode === 6) { // Quadratic Bézier
-      const x1 = cx - radius * 0.7;
-      const y1 = cy + (Math.random() - 0.5) * radius;
-      const x2 = cx + radius * 0.7;
-      const y2 = cy + (Math.random() - 0.5) * radius;
-      const cpx = cx + (Math.random() - 0.5) * radius * 1.2;
-      const cpy = cy + (Math.random() - 0.5) * radius * 1.2;
-      const width = 1.5 + Math.random() * 8;
+      const x1 = Math.max(0, Math.min(w, cx - radius * 0.6));
+      const y1 = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const x2 = Math.max(0, Math.min(w, cx + radius * 0.6));
+      const y2 = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const cpx = Math.max(0, Math.min(w, cx + (Math.random() - 0.5) * radius));
+      const cpy = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const width = Math.max(1.5, radius * 0.25);
       return { type: 'bezier2', cx, cy, x1, y1, x2, y2, cpx, cpy, width };
     } else if (targetMode === 9) { // Cubic Bézier
-      const x1 = cx - radius * 0.8;
-      const y1 = cy + (Math.random() - 0.5) * radius;
-      const x2 = cx + radius * 0.8;
-      const y2 = cy + (Math.random() - 0.5) * radius;
-      const cp1x = cx - radius * 0.3 + (Math.random() - 0.5) * radius;
-      const cp1y = cy + (Math.random() - 0.5) * radius * 1.2;
-      const cp2x = cx + radius * 0.3 + (Math.random() - 0.5) * radius;
-      const cp2y = cy + (Math.random() - 0.5) * radius * 1.2;
-      const width = 1.5 + Math.random() * 8;
+      const x1 = Math.max(0, Math.min(w, cx - radius * 0.7));
+      const y1 = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const x2 = Math.max(0, Math.min(w, cx + radius * 0.7));
+      const y2 = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const cp1x = Math.max(0, Math.min(w, cx - radius * 0.2 + (Math.random() - 0.5) * radius));
+      const cp1y = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const cp2x = Math.max(0, Math.min(w, cx + radius * 0.2 + (Math.random() - 0.5) * radius));
+      const cp2y = Math.max(0, Math.min(h, cy + (Math.random() - 0.5) * radius));
+      const width = Math.max(1.5, radius * 0.25);
       return { type: 'bezier3', cx, cy, x1, y1, x2, y2, cp1x, cp1y, cp2x, cp2y, width };
     } else { // Polygon
       const p1 = [cx - radius * 0.5, cy - radius * 0.5];
@@ -1048,8 +1130,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const startTime = performance.now();
     const count = payload.count || 100;
     const mode = payload.mode || 1;
-    const alpha = (payload.alpha || 128) / 255;
-    const simRes = Math.min(payload.resolution || 256, 256);
+    const alphaVal = payload.alpha || 128;
+    const alphaNorm = alphaVal / 255;
+    const simRes = Math.min(payload.resolution || 256, 160);
 
     const refImg = new Image();
     await new Promise((resolve) => {
@@ -1058,12 +1141,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const targetW = simRes;
-    const targetH = Math.round((refImg.naturalHeight / refImg.naturalWidth) * simRes);
+    const targetH = Math.max(32, Math.round((refImg.naturalHeight / refImg.naturalWidth) * simRes));
 
     const refCanvas = document.createElement('canvas');
     refCanvas.width = targetW;
     refCanvas.height = targetH;
-    const refCtx = refCanvas.getContext('2d');
+    const refCtx = refCanvas.getContext('2d', { willReadFrequently: true });
     refCtx.drawImage(refImg, 0, 0, targetW, targetH);
     const refData = refCtx.getImageData(0, 0, targetW, targetH).data;
 
@@ -1088,11 +1171,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const simCanvas = document.createElement('canvas');
     simCanvas.width = targetW;
     simCanvas.height = targetH;
-    const simCtx = simCanvas.getContext('2d');
+    const simCtx = simCanvas.getContext('2d', { willReadFrequently: true });
     simCtx.fillStyle = bgHex;
     simCtx.fillRect(0, 0, targetW, targetH);
+    let currentData = simCtx.getImageData(0, 0, targetW, targetH).data;
 
-    let currentScore = 0.45;
+    const scratchCanvas = document.createElement('canvas');
+    scratchCanvas.width = targetW;
+    scratchCanvas.height = targetH;
+    const scratchCtx = scratchCanvas.getContext('2d', { willReadFrequently: true });
+
+    let currentScore = 0.42;
     let completedShapes = shapeHistory.length;
     const totalTarget = completedShapes + count;
 
@@ -1112,22 +1201,88 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        const candidate = generateRandomShape(mode, targetW, targetH);
-        const sampX = Math.max(0, Math.min(targetW - 1, Math.round(candidate.cx)));
-        const sampY = Math.max(0, Math.min(targetH - 1, Math.round(candidate.cy)));
-        const pIdx = (sampY * targetW + sampX) * 4;
-        const cr = refData[pIdx];
-        const cg = refData[pIdx + 1];
-        const cb = refData[pIdx + 2];
-        candidate.color = `rgba(${cr},${cg},${cb},${alpha})`;
-        candidate.hex = `#${cr.toString(16).padStart(2,'0')}${cg.toString(16).padStart(2,'0')}${cb.toString(16).padStart(2,'0')}`;
-        candidate.alpha = alpha;
+        const progress = completedShapes / totalTarget;
 
-        drawShapeToCtx(candidate, simCtx);
+        // Importance Sampling: pick area with largest pixel error
+        let focalX = Math.random() * targetW;
+        let focalY = Math.random() * targetH;
+        let maxErr = -1;
+        for (let s = 0; s < 6; s++) {
+          const rx = Math.floor(Math.random() * targetW);
+          const ry = Math.floor(Math.random() * targetH);
+          const idx = (ry * targetW + rx) * 4;
+          const diff = Math.abs(refData[idx] - currentData[idx]) +
+                       Math.abs(refData[idx + 1] - currentData[idx + 1]) +
+                       Math.abs(refData[idx + 2] - currentData[idx + 2]);
+          if (diff > maxErr) {
+            maxErr = diff;
+            focalX = rx;
+            focalY = ry;
+          }
+        }
+
+        // Hill-climb search across candidate variations
+        let bestCandidate = null;
+        let bestDelta = 0;
+        const candidateCount = 16;
+
+        for (let c = 0; c < candidateCount; c++) {
+          const cand = generateCandidateAround(mode, focalX, focalY, targetW, targetH, progress);
+          const sampX = Math.max(0, Math.min(targetW - 1, Math.round(cand.cx)));
+          const sampY = Math.max(0, Math.min(targetH - 1, Math.round(cand.cy)));
+          const pIdx = (sampY * targetW + sampX) * 4;
+
+          cand.color = `rgba(${refData[pIdx]},${refData[pIdx+1]},${refData[pIdx+2]},${alphaNorm})`;
+          cand.hex = `#${refData[pIdx].toString(16).padStart(2,'0')}${refData[pIdx+1].toString(16).padStart(2,'0')}${refData[pIdx+2].toString(16).padStart(2,'0')}`;
+          cand.alpha = alphaNorm;
+
+          const bbox = getShapeBBox(cand, targetW, targetH);
+          if (bbox.w <= 0 || bbox.h <= 0) continue;
+
+          scratchCtx.clearRect(bbox.x, bbox.y, bbox.w, bbox.h);
+          scratchCtx.drawImage(simCanvas, bbox.x, bbox.y, bbox.w, bbox.h, bbox.x, bbox.y, bbox.w, bbox.h);
+          drawShapeToCtx(cand, scratchCtx);
+
+          const testData = scratchCtx.getImageData(bbox.x, bbox.y, bbox.w, bbox.h).data;
+          let delta = 0;
+          let testIdx = 0;
+          for (let y = bbox.y; y < bbox.y + bbox.h; y++) {
+            const rowIdx = (y * targetW + bbox.x) * 4;
+            for (let x = 0; x < bbox.w; x++) {
+              const fullIdx = rowIdx + x * 4;
+              const rR = refData[fullIdx], rG = refData[fullIdx+1], rB = refData[fullIdx+2];
+              const cR = currentData[fullIdx], cG = currentData[fullIdx+1], cB = currentData[fullIdx+2];
+              const nR = testData[testIdx], nG = testData[testIdx+1], nB = testData[testIdx+2];
+
+              const oldDiff = Math.abs(rR - cR) + Math.abs(rG - cG) + Math.abs(rB - cB);
+              const newDiff = Math.abs(rR - nR) + Math.abs(rG - nG) + Math.abs(rB - nB);
+              delta += (newDiff - oldDiff);
+              testIdx += 4;
+            }
+          }
+
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            bestCandidate = cand;
+          }
+        }
+
+        if (!bestCandidate) {
+          bestCandidate = generateCandidateAround(mode, focalX, focalY, targetW, targetH, progress);
+          const sampX = Math.max(0, Math.min(targetW - 1, Math.round(bestCandidate.cx)));
+          const sampY = Math.max(0, Math.min(targetH - 1, Math.round(bestCandidate.cy)));
+          const pIdx = (sampY * targetW + sampX) * 4;
+          bestCandidate.color = `rgba(${refData[pIdx]},${refData[pIdx+1]},${refData[pIdx+2]},${alphaNorm})`;
+          bestCandidate.hex = `#${refData[pIdx].toString(16).padStart(2,'0')}${refData[pIdx+1].toString(16).padStart(2,'0')}${refData[pIdx+2].toString(16).padStart(2,'0')}`;
+          bestCandidate.alpha = alphaNorm;
+        }
+
+        drawShapeToCtx(bestCandidate, simCtx);
+        currentData = simCtx.getImageData(0, 0, targetW, targetH).data;
         completedShapes++;
 
-        const svgChunk = buildShapeSvgChunk(candidate);
-        currentScore = Math.max(0.04, currentScore * 0.996);
+        const svgChunk = buildShapeSvgChunk(bestCandidate);
+        currentScore = Math.max(0.04, currentScore * 0.994);
 
         const elapsedSec = (performance.now() - startTime) / 1000;
         const nps = completedShapes / (elapsedSec || 0.001);
@@ -1161,6 +1316,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnStop.addEventListener('click', async () => {
     isClientRunning = false;
+    if (wasmWorker) {
+      wasmWorker.postMessage({ action: 'stop' });
+    }
     statusHint.textContent = 'Halting engine...';
     try {
       await fetch('/api/stop', { method: 'POST' });
