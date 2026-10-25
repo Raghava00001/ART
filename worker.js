@@ -60,8 +60,10 @@ self.onmessage = async (e) => {
 
         postMessage({ type: 'shape', ...stepRes });
 
-        // Yield execution to allow Stop commands
-        await new Promise((r) => setTimeout(r, 0));
+        // Yield execution periodically to maintain responsive event handling and stop commands
+        if (stepRes.frame % 3 === 0) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
       }
     } catch (err) {
       console.error('Error during WebAssembly synthesis:', err);
