@@ -1129,8 +1129,8 @@ document.addEventListener('DOMContentLoaded', () => {
     isClientRunning = true;
     const startTime = performance.now();
     const count = payload.count || 100;
-    const mode = payload.mode || 1;
-    const alphaVal = payload.alpha || 128;
+    const mode = (payload.mode !== undefined && payload.mode !== null) ? payload.mode : 1;
+    const alphaVal = (payload.alpha !== undefined && payload.alpha !== null) ? payload.alpha : 128;
     const alphaNorm = alphaVal / 255;
     const simRes = Math.min(payload.resolution || 256, 160);
 
@@ -1224,20 +1224,36 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hill-climb search across candidate variations
         let bestCandidate = null;
         let bestDelta = 0;
-        const candidateCount = 16;
+        const candidateCount = 32;
 
         for (let c = 0; c < candidateCount; c++) {
           const cand = generateCandidateAround(mode, focalX, focalY, targetW, targetH, progress);
+          const bbox = getShapeBBox(cand, targetW, targetH);
+          if (bbox.w <= 0 || bbox.h <= 0) continue;
+
+          // Compute optimal average color over the bounding region
+          let sumR = 0, sumG = 0, sumB = 0, ptCount = 0;
+          for (let y = bbox.y; y < bbox.y + bbox.h; y += 2) {
+            const row = (y * targetW + bbox.x) * 4;
+            for (let x = 0; x < bbox.w; x += 2) {
+              const idx = row + x * 4;
+              sumR += refData[idx];
+              sumG += refData[idx + 1];
+              sumB += refData[idx + 2];
+              ptCount++;
+            }
+          }
           const sampX = Math.max(0, Math.min(targetW - 1, Math.round(cand.cx)));
           const sampY = Math.max(0, Math.min(targetH - 1, Math.round(cand.cy)));
           const pIdx = (sampY * targetW + sampX) * 4;
 
-          cand.color = `rgba(${refData[pIdx]},${refData[pIdx+1]},${refData[pIdx+2]},${alphaNorm})`;
-          cand.hex = `#${refData[pIdx].toString(16).padStart(2,'0')}${refData[pIdx+1].toString(16).padStart(2,'0')}${refData[pIdx+2].toString(16).padStart(2,'0')}`;
-          cand.alpha = alphaNorm;
+          const avgR = ptCount > 0 ? Math.round(sumR / ptCount) : refData[pIdx];
+          const avgG = ptCount > 0 ? Math.round(sumG / ptCount) : refData[pIdx + 1];
+          const avgB = ptCount > 0 ? Math.round(sumB / ptCount) : refData[pIdx + 2];
 
-          const bbox = getShapeBBox(cand, targetW, targetH);
-          if (bbox.w <= 0 || bbox.h <= 0) continue;
+          cand.color = `rgba(${avgR},${avgG},${avgB},${alphaNorm})`;
+          cand.hex = `#${avgR.toString(16).padStart(2,'0')}${avgG.toString(16).padStart(2,'0')}${avgB.toString(16).padStart(2,'0')}`;
+          cand.alpha = alphaNorm;
 
           scratchCtx.clearRect(bbox.x, bbox.y, bbox.w, bbox.h);
           scratchCtx.drawImage(simCanvas, bbox.x, bbox.y, bbox.w, bbox.h, bbox.x, bbox.y, bbox.w, bbox.h);
@@ -1268,13 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!bestCandidate) {
-          bestCandidate = generateCandidateAround(mode, focalX, focalY, targetW, targetH, progress);
-          const sampX = Math.max(0, Math.min(targetW - 1, Math.round(bestCandidate.cx)));
-          const sampY = Math.max(0, Math.min(targetH - 1, Math.round(bestCandidate.cy)));
-          const pIdx = (sampY * targetW + sampX) * 4;
-          bestCandidate.color = `rgba(${refData[pIdx]},${refData[pIdx+1]},${refData[pIdx+2]},${alphaNorm})`;
-          bestCandidate.hex = `#${refData[pIdx].toString(16).padStart(2,'0')}${refData[pIdx+1].toString(16).padStart(2,'0')}${refData[pIdx+2].toString(16).padStart(2,'0')}`;
-          bestCandidate.alpha = alphaNorm;
+          continue;
         }
 
         drawShapeToCtx(bestCandidate, simCtx);
@@ -1423,10 +1433,11 @@ document.addEventListener('DOMContentLoaded', () => {
     metricTime.textContent = `${data.duration.toFixed(2)}s`;
     statusHint.textContent = `Completed in ${data.duration.toFixed(2)}s — ${matchPct}% fidelity`;
 
-    if (data.fullSVG) {
-      latestFullSvg = data.fullSVG;
+    const finalSvg = data.fullSVG || data.fullSvg;
+    if (finalSvg) {
+      latestFullSvg = finalSvg;
       const parser = new DOMParser();
-      const doc = parser.parseFromString(data.fullSVG, 'image/svg+xml');
+      const doc = parser.parseFromString(finalSvg, 'image/svg+xml');
       const root = doc.documentElement;
       if (root) {
         const vb = root.getAttribute('viewBox');

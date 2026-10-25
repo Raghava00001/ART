@@ -155,6 +155,7 @@ func stepEngine(this js.Value, args []js.Value) any {
 			"total":    completedShapes,
 			"score":    currentModel.Score,
 			"duration": time.Since(startTime).Seconds(),
+			"fullSVG":  currentModel.SVG(),
 			"fullSvg":  currentModel.SVG(),
 		}
 	}
@@ -167,26 +168,42 @@ func stepEngine(this js.Value, args []js.Value) any {
 		currentModel.SetTarget(nextTarget)
 	}
 
-	completedShapes++
 	currentModel.SetProgress(float64(completedShapes) / float64(totalTargetCount))
 
+	// Search depth mapping from currentRepeat
+	depth := currentRepeat
+	if depth < 0 {
+		depth = 0
+	} else if depth > 5 {
+		depth = 5
+	}
+	n := 150 + depth*150
+	age := 40 + depth*30
+
+	prevLen := len(currentModel.Shapes)
 	stepStart := time.Now()
-	npsCandidateCount := currentModel.Step(currentMode, currentAlpha, currentRepeat)
+	npsCandidateCount := currentModel.StepParams(currentMode, currentAlpha, 0, n, age, 2)
 	stepDuration := time.Since(stepStart).Seconds()
 	nps := float64(npsCandidateCount) / (stepDuration + 0.0001)
 
-	// Extract the newly added shape SVG snippet
-	idx := len(currentModel.Shapes) - 1
-	shape := currentModel.Shapes[idx]
-	c := currentModel.Colors[idx]
-	scale := currentModel.Scale
-	if idx < len(currentModel.Scales) {
-		scale = currentModel.Scales[idx]
-	}
+	newLen := len(currentModel.Shapes)
+	completedShapes = newLen
 
-	attrs := fmt.Sprintf("fill=\"#%02x%02x%02x\" fill-opacity=\"%f\"", c.R, c.G, c.B, float64(c.A)/255)
-	shapeSvg := shape.SVG(attrs)
-	svgChunk := fmt.Sprintf("<g transform=\"scale(%f) translate(0.5 0.5)\">%s</g>", scale, shapeSvg)
+	// Extract ALL newly added shape SVG snippets
+	var svgChunks []string
+	for idx := prevLen; idx < newLen; idx++ {
+		shape := currentModel.Shapes[idx]
+		c := currentModel.Colors[idx]
+		scale := currentModel.Scale
+		if idx < len(currentModel.Scales) {
+			scale = currentModel.Scales[idx]
+		}
+
+		attrs := fmt.Sprintf("fill=\"#%02x%02x%02x\" fill-opacity=\"%f\"", c.R, c.G, c.B, float64(c.A)/255)
+		shapeSvg := shape.SVG(attrs)
+		svgChunks = append(svgChunks, fmt.Sprintf("<g transform=\"scale(%f) translate(0.5 0.5)\">%s</g>", scale, shapeSvg))
+	}
+	svgChunk := strings.Join(svgChunks, "")
 
 	elapsedSec := time.Since(startTime).Seconds()
 

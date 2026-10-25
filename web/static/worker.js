@@ -34,10 +34,10 @@ self.onmessage = async (e) => {
     try {
       const initRes = self.primitiveInit(
         payload.imageData || payload.image,
-        payload.mode || 1,
+        (payload.mode !== undefined && payload.mode !== null) ? payload.mode : 1,
         payload.count || 100,
-        payload.alpha || 128,
-        payload.repeat || 1,
+        (payload.alpha !== undefined && payload.alpha !== null) ? payload.alpha : 128,
+        (payload.repeat !== undefined && payload.repeat !== null) ? payload.repeat : 1,
         payload.resolution || 256,
         payload.pyramid !== false
       );

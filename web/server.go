@@ -558,24 +558,37 @@ func (s *Server) runWorkerTask(rawInput image.Image, req StartRequest, cancel ch
 		progress := float64(currentShapeNum) / float64(totalTarget)
 		model.SetProgress(progress)
 
+		depth := repeat
+		if depth < 0 {
+			depth = 0
+		} else if depth > 5 {
+			depth = 5
+		}
+		numCands := 250 + depth*200
+		numAge := 60 + depth*30
+
+		prevLen := len(model.Shapes)
 		t := time.Now()
-		n := model.Step(primitive.ShapeType(mode), alpha, repeat)
+		n := model.StepParams(primitive.ShapeType(mode), alpha, 0, numCands, numAge, len(model.Workers))
 		elapsed := time.Since(start).Seconds()
 		nps := float64(n) / time.Since(t).Seconds()
 
-		// Get the last added shape's SVG chunk
-		lastIdx := len(model.Shapes) - 1
-		lastShape := model.Shapes[lastIdx]
-		lastColor := model.Colors[lastIdx]
-		lastScale := model.Scales[lastIdx]
-		attrs := fmt.Sprintf("fill=\"#%02x%02x%02x\" fill-opacity=\"%f\"",
-			lastColor.R, lastColor.G, lastColor.B, float64(lastColor.A)/255)
-		shapeSVG := fmt.Sprintf("<g transform=\"scale(%f) translate(0.5 0.5)\">%s</g>",
-			lastScale, lastShape.SVG(attrs))
+		newLen := len(model.Shapes)
+		var svgChunks []string
+		for idx := prevLen; idx < newLen; idx++ {
+			shape := model.Shapes[idx]
+			c := model.Colors[idx]
+			scale := model.Scales[idx]
+			attrs := fmt.Sprintf("fill=\"#%02x%02x%02x\" fill-opacity=\"%f\"",
+				c.R, c.G, c.B, float64(c.A)/255)
+			svgChunks = append(svgChunks, fmt.Sprintf("<g transform=\"scale(%f) translate(0.5 0.5)\">%s</g>",
+				scale, shape.SVG(attrs)))
+		}
+		shapeSVG := strings.Join(svgChunks, "")
 
 		event := map[string]interface{}{
 			"type":       "shape",
-			"frame":      currentShapeNum,
+			"frame":      newLen,
 			"total":      totalTarget,
 			"score":      model.Score,
 			"elapsed":    elapsed,
