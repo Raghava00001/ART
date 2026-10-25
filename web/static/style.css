@@ -1334,7 +1334,7 @@ body {
 .floating-stage-dock {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
   padding: 6px 14px;
   background: var(--dock-bg);
   backdrop-filter: blur(20px);
@@ -1343,6 +1343,8 @@ body {
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
+  max-width: min(94vw, 960px);
+  box-sizing: border-box;
 }
 
 .footer-status {
@@ -1352,6 +1354,10 @@ body {
   font-size: 0.75rem;
   color: var(--text-secondary);
   white-space: nowrap;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .status-pulse-dot {
@@ -1359,6 +1365,80 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--accent-emerald);
+  flex-shrink: 0;
+}
+
+/* Interactive Timeline Scrubber & Replay Bar */
+.timeline-scrubber-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-muted);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px 2px 4px;
+  border: 1px solid var(--border-hairline);
+  flex-shrink: 0;
+}
+
+.timeline-scrubber-wrap.hidden {
+  display: none !important;
+}
+
+/* Gracefully hide keyboard hint when timeline scrubber is active to prevent overlapping */
+.timeline-scrubber-wrap:not(.hidden) ~ .footer-center-hint {
+  display: none !important;
+}
+
+.timeline-play-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-spring);
+  flex-shrink: 0;
+}
+
+.timeline-play-btn:hover {
+  transform: scale(1.12);
+}
+
+.timeline-play-btn:active {
+  transform: scale(0.95);
+}
+
+.timeline-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 95px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface-raised);
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+
+.timeline-step-text {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 .footer-center-hint {
@@ -1367,7 +1447,18 @@ body {
   gap: 8px;
   border-left: 1px solid var(--border-hairline);
   border-right: 1px solid var(--border-hairline);
-  padding: 0 12px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .footer-center-hint {
+    display: none !important;
+  }
+}
+
+.comparison-toolbar {
+  flex-shrink: 0;
 }
 
 .footer-kbd-tag {
@@ -1395,6 +1486,7 @@ body {
   border-radius: var(--radius-pill);
   padding: 2px;
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .segment-btn {

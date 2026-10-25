@@ -336,25 +336,26 @@ func (model *Model) Add(shape Shape, alpha int) {
 }
 
 func (model *Model) Step(shapeType ShapeType, alpha, repeat int) int {
-	state := model.runWorkers(shapeType, alpha, 1000, 100, 16)
-	// state = HillClimb(state, 1000).(*State)
+	if len(model.Workers) == 1 {
+		return model.StepParams(shapeType, alpha, repeat, 250, 60, 2)
+	}
+	return model.StepParams(shapeType, alpha, repeat, 1000, 100, 16)
+}
+
+func (model *Model) StepParams(shapeType ShapeType, alpha, repeat, n, age, m int) int {
+	state := model.runWorkers(shapeType, alpha, n, age, m)
 	model.Add(state.Shape, state.Alpha)
 
 	for i := 0; i < repeat; i++ {
 		state.Worker.Init(model.Current, model.Score)
 		a := state.Energy()
-		state = HillClimb(state, 100).(*State)
+		state = HillClimb(state, age).(*State)
 		b := state.Energy()
 		if a == b {
 			break
 		}
 		model.Add(state.Shape, state.Alpha)
 	}
-
-	// for _, w := range model.Workers[1:] {
-	// 	model.Workers[0].Heatmap.AddHeatmap(w.Heatmap)
-	// }
-	// SavePNG("heatmap.png", model.Workers[0].Heatmap.Image(0.5))
 
 	counter := 0
 	for _, worker := range model.Workers {

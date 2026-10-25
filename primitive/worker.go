@@ -2,7 +2,6 @@ package primitive
 
 import (
 	"image"
-	"math"
 	"math/rand"
 	"time"
 
@@ -47,7 +46,7 @@ func (worker *Worker) Init(current *image.RGBA, score float64) {
 	worker.Heatmap.Clear()
 }
 
-// ScaleFactor anneals from 1.0 (coarse broad strokes) down to ~0.20 (fine facial detail)
+// ScaleFactor anneals from 1.0 (coarse broad strokes) down to ~0.50 (fine geometric facets)
 // as synthesis progress advances from 0% to 100%.
 func (worker *Worker) ScaleFactor() float64 {
 	p := worker.Progress
@@ -55,29 +54,27 @@ func (worker *Worker) ScaleFactor() float64 {
 		return 1.0
 	}
 	if p >= 1.0 {
-		return 0.20
+		return 0.50
 	}
-	// Smooth curve: high scale early, tapering into razor-sharp micro-primitives
-	factor := 1.0 - 0.80*math.Pow(p, 1.2)
-	if factor < 0.20 {
-		return 0.20
+	factor := 1.0 - 0.50*p
+	if factor < 0.50 {
+		return 0.50
 	}
 	return factor
 }
 
-// FeatureScaleFactor scales down shape radius when spawning directly over a high-saliency
-// feature (such as eyes, nostrils, lips, or jawline) so the engine immediately adapts
-// its brush size to delicate micro-strokes rather than averaging the region.
+// FeatureScaleFactor scales down shape radius moderately when spawning directly over a high-saliency
+// feature so the engine refines delicate micro-strokes without collapsing into microscopic shards.
 func (worker *Worker) FeatureScaleFactor(x, y int) float64 {
 	base := worker.ScaleFactor()
 	if worker.Saliency == nil {
 		return base
 	}
 	s := worker.Saliency.SaliencyAt(x, y)
-	if s > 0.15 {
-		featureFactor := 1.0 - 0.80*math.Pow((s-0.15)/0.85, 0.7)
-		if featureFactor < 0.20 {
-			featureFactor = 0.20
+	if s > 0.20 {
+		featureFactor := 1.0 - 0.35*s
+		if featureFactor < 0.65 {
+			featureFactor = 0.65
 		}
 		return base * featureFactor
 	}
@@ -85,36 +82,36 @@ func (worker *Worker) FeatureScaleFactor(x, y int) float64 {
 }
 
 // MutationStep returns the annealed Gaussian mutation magnitude for hill climbing.
+// Keeps a minimum step of 10.0 to ensure vertices actively explore and adjust.
 func (worker *Worker) MutationStep(base float64) float64 {
 	step := base * worker.ScaleFactor()
-	if step < 2.0 {
-		return 2.0
+	if step < 10.0 {
+		return 10.0
 	}
 	return step
 }
 
 // MutationStepFor returns the mutation step scaled to local feature detail.
+// Keeps a minimum step of 10.0 to guarantee effective vertex perturbation.
 func (worker *Worker) MutationStepFor(base float64, x, y int) float64 {
 	step := base * worker.FeatureScaleFactor(x, y)
-	if step < 1.0 {
-		return 1.0
+	if step < 10.0 {
+		return 10.0
 	}
 	return step
 }
 
 // SamplePosition returns a spawn coordinate for a new shape.
-// If an ErrorMap is available:
-// - During the initial blocking phase (Progress <= 0.20), samples globally.
-// - During detail refinement (Progress > 0.20), prioritizes prominent facial
-//   feature cells (eyes, pupils, lips, jawline) 55% of the time.
+// Retains 25% global uniform random exploration so the background, edges, and
+// broad tonal areas are never starved.
 func (worker *Worker) SamplePosition() (int, int) {
-	if worker.ErrMap != nil {
-		if worker.Progress > 0.20 && worker.ErrMap.HasFeatures && worker.Rnd.Float64() < 0.25 {
-			return worker.ErrMap.SampleFeature(worker.Rnd)
-		}
-		return worker.ErrMap.Sample(worker.Rnd)
+	if worker.Rnd.Float64() < 0.25 || worker.ErrMap == nil {
+		return worker.Rnd.Intn(worker.W), worker.Rnd.Intn(worker.H)
 	}
-	return worker.Rnd.Intn(worker.W), worker.Rnd.Intn(worker.H)
+	if worker.Progress > 0.30 && worker.ErrMap.HasFeatures && worker.Rnd.Float64() < 0.35 {
+		return worker.ErrMap.SampleFeature(worker.Rnd)
+	}
+	return worker.ErrMap.Sample(worker.Rnd)
 }
 
 // SamplePositionFloat returns a spawn coordinate as float64.

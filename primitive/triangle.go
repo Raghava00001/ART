@@ -17,12 +17,16 @@ type Triangle struct {
 func NewRandomTriangle(worker *Worker) *Triangle {
 	rnd := worker.Rnd
 	x1, y1 := worker.SamplePosition()
-	span := maxInt(6, int(31*worker.FeatureScaleFactor(x1, y1)))
+	dim := (worker.W + worker.H) / 2
+	span := int(float64(dim) * 0.22 * worker.FeatureScaleFactor(x1, y1))
+	if span < 18 {
+		span = 18
+	}
 	half := span / 2
-	x2 := x1 + rnd.Intn(span) - half
-	y2 := y1 + rnd.Intn(span) - half
-	x3 := x1 + rnd.Intn(span) - half
-	y3 := y1 + rnd.Intn(span) - half
+	x2 := clampInt(x1+rnd.Intn(span)-half, 0, worker.W-1)
+	y2 := clampInt(y1+rnd.Intn(span)-half, 0, worker.H-1)
+	x3 := clampInt(x1+rnd.Intn(span)-half, 0, worker.W-1)
+	y3 := clampInt(y1+rnd.Intn(span)-half, 0, worker.H-1)
 	t := &Triangle{worker, x1, y1, x2, y2, x3, y3}
 	t.Mutate()
 	return t
@@ -72,6 +76,13 @@ func (t *Triangle) Mutate() {
 }
 
 func (t *Triangle) Valid() bool {
+	minX := minInt(t.X1, minInt(t.X2, t.X3))
+	maxX := maxInt(t.X1, maxInt(t.X2, t.X3))
+	minY := minInt(t.Y1, minInt(t.Y2, t.Y3))
+	maxY := maxInt(t.Y1, maxInt(t.Y2, t.Y3))
+	if (maxX-minX) < 5 || (maxY-minY) < 5 {
+		return false
+	}
 	const minDegrees = 15
 	var a1, a2, a3 float64
 	{

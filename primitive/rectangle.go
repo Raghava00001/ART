@@ -16,9 +16,13 @@ type Rectangle struct {
 func NewRandomRectangle(worker *Worker) *Rectangle {
 	rnd := worker.Rnd
 	x1, y1 := worker.SamplePosition()
-	span := maxInt(6, int(32*worker.FeatureScaleFactor(x1, y1)))
-	x2 := clampInt(x1+rnd.Intn(span)+1, 0, worker.W-1)
-	y2 := clampInt(y1+rnd.Intn(span)+1, 0, worker.H-1)
+	dim := (worker.W + worker.H) / 2
+	span := int(float64(dim) * 0.20 * worker.FeatureScaleFactor(x1, y1))
+	if span < 16 {
+		span = 16
+	}
+	x2 := clampInt(x1+rnd.Intn(span)+4, 0, worker.W-1)
+	y2 := clampInt(y1+rnd.Intn(span)+4, 0, worker.H-1)
 	return &Rectangle{worker, x1, y1, x2, y2}
 }
 
@@ -88,9 +92,13 @@ type RotatedRectangle struct {
 func NewRandomRotatedRectangle(worker *Worker) *RotatedRectangle {
 	rnd := worker.Rnd
 	x, y := worker.SamplePosition()
-	span := maxInt(6, int(32*worker.ScaleFactor()))
-	sx := rnd.Intn(span) + 1
-	sy := rnd.Intn(span) + 1
+	dim := (worker.W + worker.H) / 2
+	span := int(float64(dim) * 0.18 * worker.ScaleFactor())
+	if span < 14 {
+		span = 14
+	}
+	sx := rnd.Intn(span) + 4
+	sy := rnd.Intn(span) + 4
 	a := rnd.Intn(360)
 	r := &RotatedRectangle{worker, x, y, sx, sy, a}
 	r.Mutate()

@@ -194,8 +194,8 @@ func (em *ErrorMap) rebuildCDF() {
 	em.TotalFeatError = 0
 
 	for i, e := range em.Errors {
-		// Use high-contrast power curve to aggressively target stubborn feature errors
-		w := math.Pow(e, 1.15) + 1e-10
+		// Use linear Euclidean perceptual color error (sqrt of squared difference sum) + floor
+		w := math.Sqrt(e) + 1.0
 		em.TotalError += w
 		em.CDF[i] = em.TotalError
 
@@ -209,7 +209,7 @@ func (em *ErrorMap) rebuildCDF() {
 			s := em.Saliency.CellAverage(startX, startY, endX, endY)
 			if s >= 0.65 {
 				em.FeatureIndices = append(em.FeatureIndices, i)
-				fw := math.Pow(e, 1.15) + 1e-10
+				fw := math.Sqrt(e) + 1.0
 				em.TotalFeatError += fw
 				em.FeatureCDF = append(em.FeatureCDF, em.TotalFeatError)
 			}

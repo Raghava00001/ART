@@ -18,17 +18,25 @@ type Ellipse struct {
 func NewRandomEllipse(worker *Worker) *Ellipse {
 	rnd := worker.Rnd
 	x, y := worker.SamplePosition()
-	span := maxInt(4, int(32*worker.FeatureScaleFactor(x, y)))
-	rx := rnd.Intn(span) + 1
-	ry := rnd.Intn(span) + 1
+	dim := (worker.W + worker.H) / 2
+	span := int(float64(dim) * 0.18 * worker.FeatureScaleFactor(x, y))
+	if span < 12 {
+		span = 12
+	}
+	rx := rnd.Intn(span) + 3
+	ry := rnd.Intn(span) + 3
 	return &Ellipse{worker, x, y, rx, ry, false}
 }
 
 func NewRandomCircle(worker *Worker) *Ellipse {
 	rnd := worker.Rnd
 	x, y := worker.SamplePosition()
-	span := maxInt(4, int(32*worker.FeatureScaleFactor(x, y)))
-	r := rnd.Intn(span) + 1
+	dim := (worker.W + worker.H) / 2
+	span := int(float64(dim) * 0.18 * worker.FeatureScaleFactor(x, y))
+	if span < 12 {
+		span = 12
+	}
+	r := rnd.Intn(span) + 3
 	return &Ellipse{worker, x, y, r, r, true}
 }
 

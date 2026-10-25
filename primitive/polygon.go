@@ -22,7 +22,8 @@ func NewRandomPolygon(worker *Worker, order int, convex bool) *Polygon {
 	y := make([]float64, order)
 	x[0], y[0] = worker.SamplePositionFloat()
 	scale := worker.FeatureScaleFactor(int(x[0]), int(y[0]))
-	span := math.Max(8.0, 40.0*scale)
+	dim := float64(worker.W+worker.H) / 2
+	span := math.Max(18.0, dim*0.20*scale)
 	half := span / 2
 	for i := 1; i < order; i++ {
 		x[i] = x[0] + rnd.Float64()*span - half

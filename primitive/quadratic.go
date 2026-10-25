@@ -21,13 +21,14 @@ func NewRandomQuadratic(worker *Worker) *Quadratic {
 	rnd := worker.Rnd
 	x1, y1 := worker.SamplePositionFloat()
 	scale := worker.FeatureScaleFactor(int(x1), int(y1))
-	span := math.Max(8.0, 40.0*scale)
+	dim := float64(worker.W+worker.H) / 2
+	span := math.Max(18.0, dim*0.18*scale)
 	half := span / 2
 	x2 := x1 + rnd.Float64()*span - half
 	y2 := y1 + rnd.Float64()*span - half
 	x3 := x2 + rnd.Float64()*span - half
 	y3 := y2 + rnd.Float64()*span - half
-	width := math.Max(0.5, (rnd.Float64()*2.0+0.5)*scale)
+	width := math.Max(1.5, (rnd.Float64()*2.5+1.0)*scale)
 	q := &Quadratic{worker, x1, y1, x2, y2, x3, y3, width}
 	q.Mutate()
 	return q
